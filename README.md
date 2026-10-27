@@ -8,13 +8,13 @@ The existing [Android GitHub Actions workflow](https://github.com/Yaushi420/Neon
 
 ## Gameplay and scores
 
-Tap rotates. Swipe left/right moves. Swipe down soft-drops; a fast downward flick or double-tap animates the hard drop. Swipe up or tap Hold to save the piece. The game has a short grace period after hard drops, a top-right menu, sound options, and seven random selectable tracks.
+Every tap rotates, including two quick taps. Swipe left/right moves. Swipe down soft-drops; only a fast downward flick triggers the animated hard drop. Swipe up or tap Hold to save the piece. The game has a short grace period after hard drops, a top-right menu, sound options, and seven random selectable tracks.
 
 After each run you can enter a name for an **on-device leaderboard** (top 30). Scores are stored locally in the WebView and are not synchronized between devices.
 
 ## Soundtrack
 
-Seven built-in slots: Pixel Classic, Neon Drive, Cinematic Rise, Battle 99, Swing Shift, Hardbass Rush, and Neon Reactor.
+Gapless looping uses a decoded Web Audio buffer on supported Android versions; HTML audio remains as a compatibility fallback. Seven built-in slots: Pixel Classic, Neon Drive, Cinematic Rise, Battle 99, Swing Shift, Hardbass Rush, and Neon Reactor.
 
 Each built-in track uses **two files**:
 - `app/src/main/assets/music/<track_id>_intro.m4a` (opening + first main passage, once)
@@ -24,7 +24,7 @@ The game also supports per-track enable/disable, an individual max speed, TEST M
 
 **Repository limitation:** The seven uploaded commercial/remix recordings and derived 14 audio files are *not stored in this public GitHub repository*. When absent, `tools/generate_soundtrack.py` generates 14 placeholder files before GitHub's Android build. The locally packaged Original Soundtrack APK in the chat is different from a standard GitHub debug artifact until these replacements are provided.
 
-The selected loop points and repeat lengths are documented in `soundtrack/loop_points.json`. To recreate the original files with the required permission to use and redistribute the recordings:
+The v2.1 extended loop points (approximately 63–179 seconds per repeat) and smooth crossfade settings are documented in `soundtrack/loop_points.json`. To recreate the original files with the required permission to use and redistribute the recordings:
 
 1. Supply seven source .m4a files in `soundtrack-sources/`, with filename prefixes matching the `source` field in `soundtrack/loop_points.json`.
 2. Install Python numpy and FFmpeg, then run `python3 tools/segment_original_music.py`.

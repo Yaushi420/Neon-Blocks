@@ -1,46 +1,46 @@
 {
   "version": 1,
   "description": "Selected repeated main sections of the seven user-supplied original songs",
-  "note": "Intro: source from 0 through (end-0.18 s). Loop: cyclic 180 ms crossfade plus main segment; add 5 ms AAC safety edge fades.",
-  "crossfade_seconds": 0.18,
-  "edge_fade_seconds": 0.005,
+  "note": "Long main section, 1-second cyclic raised-cosine crossfade; no fade-to-silence at repeat boundaries. Intro plays once, then the extended loop repeats without gaps in Android WebAudio.",
+  "crossfade_seconds": 1,
+  "edge_fade_seconds": 0,
   "source_dir": "soundtrack-sources",
   "target_dir": "app/src/main/assets/music",
   "tracks": {
     "pixel_classic": {
       "source": "Marcel S",
-      "start": 16,
-      "end": 54.6
+      "start": 15,
+      "end": 79.25
     },
     "neon_drive": {
       "source": "Diversity",
-      "start": 18,
-      "end": 54.6
+      "start": 28.25,
+      "end": 180.625
     },
     "cinematic_rise": {
       "source": "L'Orchestra Cinématique",
-      "start": 71.2,
-      "end": 103
+      "start": 74,
+      "end": 170
     },
     "battle_99": {
       "source": "SoundHub",
-      "start": 30.4,
-      "end": 75
+      "start": 34.9,
+      "end": 214.97
     },
     "swing_shift": {
       "source": "The Musical Ghost",
-      "start": 16.8,
-      "end": 78.2
+      "start": 20.3,
+      "end": 110.15
     },
     "hardbass_rush": {
       "source": "DJ ADISQUAT",
-      "start": 38,
-      "end": 71
+      "start": 38.5,
+      "end": 209.43
     },
     "neon_reactor": {
       "source": "MiatriSs",
-      "start": 21.6,
-      "end": 85
+      "start": 22.6,
+      "end": 168.26
     }
   }
 }
