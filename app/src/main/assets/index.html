@@ -64,6 +64,17 @@ button{font:inherit;color:inherit}
 .saveScore{display:block;margin:14px auto 4px;font-size:15px}.boardPanel h2{text-shadow:0 0 13px #00ebff;color:#fff}
 .boardTable{margin-top:14px;background:#080b47;border-radius:8px;overflow:hidden}.boardHeader,.boardResult{display:grid;grid-template-columns:48px 1fr 100px;gap:6px;align-items:center;padding:10px 8px}
 .boardHeader{color:#89e9ff;border-bottom:1px solid #4a55c7;font-size:10px;font-weight:900;letter-spacing:.7px}.boardResult{border-bottom:1px solid #252a82;font-size:12px}.boardResult:nth-child(1){color:#ffe473;font-weight:900}.boardResult span:last-child{text-align:right;font-variant-numeric:tabular-nums;font-weight:900}.soundCheck{border:1px solid #66d8f2;border-radius:8px;background:#283993;color:#fff;padding:9px 13px;font-size:12px;font-weight:800}
+
+/* Bottom touch controls only reduce the board height while Button Mode is selected. */
+.buttonControls{display:none;flex:0 0 auto;grid-template-columns:repeat(6,minmax(0,1fr));gap:5px;padding:5px 2px 2px;user-select:none;-webkit-user-select:none;touch-action:none}
+.buttonControls.active{display:grid}
+.controlKey{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:66px;min-width:0;padding:4px 0;border:1px solid #5f85ee;border-radius:12px;background:linear-gradient(145deg,#29339b,#11185e);box-shadow:inset 0 2px 1px #ffffff33,0 3px 0 #070936;color:#defbff;touch-action:none;cursor:pointer}
+.controlKey .keySymbol{font-size:28px;font-weight:900;line-height:1}
+.controlKey .keyLabel{font-size:8px;font-weight:850;letter-spacing:.3px}
+.controlKey:active,.controlKey.pressed{transform:translateY(2px);background:linear-gradient(145deg,#1b9ac6,#293ea4);box-shadow:inset 0 1px 5px #05072a}
+.controlKey.rotateKey{border-color:#b580ff;color:#eccdff}.controlKey.downKey{border-color:#65f0bc;color:#86ffdd}
+.controlKey.holdKey{border-color:#ffb85a;color:#ffe0ac}.controlKey.dropKey{border-color:#ff5dc1;color:#ffd0ed}
+@media(max-width:360px){.buttonControls{gap:3px}.controlKey{min-height:60px;border-radius:9px}.controlKey .keySymbol{font-size:25px}.controlKey .keyLabel{font-size:7px}}
 </style>
 </head>
 <body>
@@ -91,12 +102,23 @@ button{font:inherit;color:inherit}
       <div id="clearFlash" class="clearFlash"></div><div id="lineBanner" class="lineBanner"></div><div class="cover" id="cover"><div><h2 id="coverTitle">NEON BLOCKS</h2><p id="coverText">Tap to rotate · swipe to move/drop<br>Swipe up to hold · fast downward flick for hard drop</p><button class="primary" id="start">PLAY</button></div></div>
     </div>
   </div>
+  <div id="buttonControls" class="buttonControls" aria-label="Touch button controls">
+    <button class="controlKey" data-control="left" aria-label="Move left"><span class="keySymbol">◀</span><span class="keyLabel">LEFT</span></button>
+    <button class="controlKey" data-control="right" aria-label="Move right"><span class="keySymbol">▶</span><span class="keyLabel">RIGHT</span></button>
+    <button class="controlKey rotateKey" data-control="rotate" aria-label="Rotate"><span class="keySymbol">↻</span><span class="keyLabel">ROTATE</span></button>
+    <button class="controlKey downKey" data-control="down" aria-label="Soft drop"><span class="keySymbol">▼</span><span class="keyLabel">DOWN</span></button>
+    <button class="controlKey holdKey" data-control="hold" aria-label="Hold"><span class="keySymbol">▣</span><span class="keyLabel">HOLD</span></button>
+    <button class="controlKey dropKey" data-control="drop" aria-label="Hard drop"><span class="keySymbol">⤓</span><span class="keyLabel">DROP</span></button>
+  </div>
 </div>
 <div class="screen" id="settingsScreen"><div class="panel"><h2>Settings</h2>
   <div class="row"><label for="musicOn">Music</label><input id="musicOn" type="checkbox" checked></div>
   <div class="row"><label for="musicVolume">Music volume</label><input id="musicVolume" type="range" min="0" max="100" step="5" value="85"></div><div class="row"><label for="sfxOn">Sound effects</label><input id="sfxOn" type="checkbox" checked></div><div class="row"><span>Check impact sounds</span><button class="soundCheck" id="sfxTest" type="button">TEST SFX</button></div>
   <div class="row"><label for="ghostOn">Ghost piece</label><input id="ghostOn" type="checkbox" checked></div>
   <div class="row"><label for="hapticLevel">Haptic feedback</label><select id="hapticLevel"><option value="0">Off</option><option value="1">Light</option><option value="2">Medium</option><option value="3">Strong</option></select></div>
+  <div class="row"><label for="controlMode">Control style</label><select id="controlMode"><option value="swipe">Swipe</option><option value="buttons">Buttons</option></select></div>
+  <div class="row"><label for="rotationSnap">Vertical → horizontal snap</label><select id="rotationSnap"><option value="center">Center</option><option value="left">Left</option><option value="right">Right</option></select></div>
+  <p class="hint">Snap alignment sets which side of the column a straight vertical piece expands toward when rotating horizontally. A full turn returns to its original column whenever space permits. Button mode adds LEFT, RIGHT, ROTATE, DOWN, HOLD and DROP along the bottom.</p>
   <p class="hint" id="musicStatus" role="status"></p><div class="musicTools" id="soundtrackLibrary"><h3>🎵 Built-in Soundtrack</h3><p class="musicLibraryLead">All seven songs are inside the app. Toggle tracks, set each maximum speed, and use TEST MAX to preview them.</p>
     <div id="musicList" class="musicList"></div>
     <h3 style="margin-top:14px">Add your own songs</h3><label class="musicUpload">＋ ADD SONGS<input id="musicFiles" type="file" accept="audio/*" multiple></label>
@@ -127,13 +149,24 @@ let board=[],queue=[],bag=[],piece=null,held=null,holdUsed=false,score=0,lines=0
 function getStore(k,d){try{const v=localStorage.getItem(k);return v===null?d:JSON.parse(v)}catch(e){return d}}
 function putStore(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 best=getStore('high',0);
-const prefs={music:getStore('musicEnabled',true),musicVolume:Number(getStore('musicVolume',85)),sfx:getStore('sfxEnabled',true),ghost:getStore('ghostEnabled',true),haptic:Number(getStore('hapticStrength',1)),builtins:getStore('builtinMusicEnabled',{pixel_classic:true,neon_drive:true,cinematic_rise:true,battle_99:true,swing_shift:true,hardbass_rush:true,neon_reactor:true}),maxSpeeds:getStore('builtinMusicMaxSpeeds',{})};
+const prefs={controls:getStore('controlMode','swipe'),rotationSnap:getStore('rotationSnap','center'),music:getStore('musicEnabled',true),musicVolume:Number(getStore('musicVolume',85)),sfx:getStore('sfxEnabled',true),ghost:getStore('ghostEnabled',true),haptic:Number(getStore('hapticStrength',1)),builtins:getStore('builtinMusicEnabled',{pixel_classic:true,neon_drive:true,cinematic_rise:true,battle_99:true,swing_shift:true,hardbass_rush:true,neon_reactor:true}),maxSpeeds:getStore('builtinMusicMaxSpeeds',{})};
 $('musicOn').checked=prefs.music;$('musicVolume').value=String(prefs.musicVolume);$('sfxOn').checked=prefs.sfx;$('ghostOn').checked=prefs.ghost;$('hapticLevel').value=String(prefs.haptic);
+if(!['swipe','buttons'].includes(prefs.controls))prefs.controls='swipe';
+if(!['left','center','right'].includes(prefs.rotationSnap))prefs.rotationSnap='center';
+$('controlMode').value=prefs.controls;$('rotationSnap').value=prefs.rotationSnap;
+function applyControlMode(){
+  $('buttonControls').classList.toggle('active',prefs.controls==='buttons');
+  $('coverText').textContent=prefs.controls==='buttons'
+    ?'Use the bottom buttons to move, rotate, drop, and hold.'
+    :'Tap to rotate · swipe left/right to move · swipe down to drop · flick down to hard drop';
+  requestAnimationFrame(resizeBoard);
+}
+applyControlMode();
 function resizeBoard(){const area=$('gameArea').getBoundingClientRect();if(area.width<=0||area.height<=0)return;const w=Math.floor(Math.min(area.width,area.height/2));const h=w*2;const wrap=$('boardWrap');wrap.style.width=w+'px';wrap.style.height=h+'px'}
 window.addEventListener('resize',resizeBoard);requestAnimationFrame(resizeBoard);
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 function take(){while(queue.length<5){if(!bag.length)bag=shuffle(TYPES.slice());queue.push(bag.pop())}return queue.shift()}
-function make(t){return {t,x:3,y:-1,blocks:SHAPES[t].map(p=>p.slice())}}
+function make(t){return {t,x:3,y:-1,blocks:SHAPES[t].map(p=>p.slice()),rot:0,rotationHomeX:null,snapStyle:prefs.rotationSnap}}
 function fits(p,dx=0,dy=0,blocks=p.blocks){return blocks.every(([x,y])=>{const xx=p.x+x+dx,yy=p.y+y+dy;return xx>=0&&xx<W&&yy<H&&(yy<0||!board[yy][xx])})}
 function spawn(){piece=make(take());holdUsed=false;if(!fits(piece)){gameOver();return}drawPreviews()}
 function updateHud(){if(score>best){best=score;putStore('high',best)}$('score').textContent=score.toLocaleString();$('lines').textContent=String(lines);$('level').textContent=String(level)}
@@ -141,15 +174,45 @@ function newGameState(){board=Array.from({length:H},()=>Array(W).fill(null));que
 function cover(title,text,button){$('coverTitle').classList.remove('countdown');$('coverTitle').textContent=title;$('coverText').textContent=text;$('coverText').style.display='block';$('start').textContent=button;$('start').style.display='inline-block';$('cover').classList.remove('hidden')}
 function hideCover(){$('cover').classList.add('hidden')}
 function countdown(){if(counting)return;counting=true;started=false;over=false;$('cover').classList.remove('hidden');$('coverText').style.display='none';$('start').style.display='none';$('coverTitle').classList.add('countdown');let n=3;$('coverTitle').textContent=n;const timer=setInterval(()=>{n--;if(n>0){$('coverTitle').textContent=n;beep(210+n*45,.055,.35)}else{clearInterval(timer);$('coverTitle').classList.remove('countdown');$('coverText').style.display='block';$('start').style.display='inline-block';newGameState();hideCover();beep(460,.08,.55)}},650)}
-function move(dx){if(!canPlay())return false;if(fits(piece,dx,0)){piece.x+=dx;beep(150,.025,.14);haptic('move');return true}return false}
+function move(dx){if(!canPlay())return false;if(fits(piece,dx,0)){piece.x+=dx;if(piece.rotationHomeX!==null)piece.rotationHomeX+=dx;beep(150,.025,.14);haptic('move');return true}return false}
 function rotated(blocks){return blocks.map(([x,y])=>[3-y,x])}
-function rotate(){if(!canPlay())return;const r=rotated(piece.blocks);for(const dx of [0,-1,1,-2,2])for(const dy of [0,-1,-2])if(fits(piece,dx,dy,r)){piece.x+=dx;piece.y+=dy;piece.blocks=r;beep(280,.045,.22);haptic('rotate');return}}
+// Straight piece: consistent orientation-relative offsets, so four turns cancel.
+// A centered piece expands around its column. Left and Right keep the existing
+// vertical column at the corresponding end of the next horizontal position.
+function snapOffset(t,style,orientation){
+  if(t!=='I'||style==='center')return 0;
+  return style==='left'?[0,1,0,2][orientation]:[0,-2,0,-1][orientation];
+}
+function rotationCandidates(preferred,home){
+  const result=[];for(const n of [home,preferred,0,preferred-1,preferred+1,preferred-2,preferred+2,-1,1,-2,2]){
+    if(n!==null&&Number.isFinite(n)&&!result.includes(n))result.push(n);
+  }
+  return result;
+}
+function rotate(){
+ if(!canPlay())return;
+ const from=piece.rot||0,to=(from+1)%4,r=rotated(piece.blocks),startX=piece.x;
+ const preferred=snapOffset(piece.t,piece.snapStyle,to)-snapOffset(piece.t,piece.snapStyle,from);
+ const home=to===0&&piece.rotationHomeX!==null?piece.rotationHomeX-piece.x:null;
+ // Never apply a wall kick when the intended column is already legal.
+ for(const dy of [0,-1,-2]){
+  for(const dx of rotationCandidates(preferred,home)){
+   if(fits(piece,dx,dy,r)){
+    if(from===0)piece.rotationHomeX=startX;
+    piece.x+=dx;piece.y+=dy;piece.rot=to;piece.blocks=r;
+    if(to===0)piece.rotationHomeX=null;
+    beep(280,.04,.23);haptic('rotate');return true;
+   }
+  }
+ }
+ return false;
+}
 function softDrop(manual=true){if(!canPlay())return;if(fits(piece,0,1)){piece.y++;if(manual){score++;updateHud()}}else{if(manual)inputLockUntil=performance.now()+220;lockPiece()}}
-function hardDrop(){if(!canPlay())return;let d=0;while(fits(piece,0,d+1))d++;if(d<=0){beep(190,.055,.34);haptic('hard');inputLockUntil=performance.now()+220;lockPiece();return}dropAnimating=true;lockDelay=true;const startY=piece.y,targetY=piece.y+d,startT=performance.now(),duration=Math.min(260,95+d*13);beep(210,.06,.38);haptic('hard');function frame(t){if(!piece)return;const p=Math.min(1,(t-startT)/duration),ease=1-Math.pow(1-p,3);piece.y=startY+Math.min(d,Math.floor(ease*d));if(p<1){requestAnimationFrame(frame)}else{piece.y=targetY;score+=d*2;updateHud();dropAnimating=false;lockDelay=false;inputLockUntil=performance.now()+220;lockPiece()}}requestAnimationFrame(frame)}
+function hardDrop(){if(!canPlay())return;let d=0;while(fits(piece,0,d+1))d++;if(d<=0){beep(190,.055,.34);haptic('hard');inputLockUntil=performance.now()+220;lockPiece();return}dropAnimating=true;lockDelay=true;const startY=piece.y,targetY=piece.y+d,startT=performance.now(),duration=Math.min(185,68+d*9);beep(210,.06,.38);haptic('hard');function frame(t){if(!piece)return;const p=Math.min(1,(t-startT)/duration),ease=1-Math.pow(1-p,3);piece.y=startY+Math.min(d,Math.floor(ease*d));if(p<1){requestAnimationFrame(frame)}else{piece.y=targetY;score+=d*2;updateHud();dropAnimating=false;lockDelay=false;inputLockUntil=performance.now()+220;lockPiece()}}requestAnimationFrame(frame)}
 function holdPiece(){if(!canPlay()||holdUsed)return;const t=piece.t;if(held===null){held=t;piece=make(take())}else{piece=make(held);held=t}holdUsed=true;if(!fits(piece)){gameOver();return}beep(330,.05,.25);haptic('hold');drawPreviews()}
 function canPlay(){return started&&!paused&&!over&&!counting&&!lockDelay&&!dropAnimating&&performance.now()>=inputLockUntil&&piece}
 function lockPiece(){let topped=false;for(const [x,y] of piece.blocks){const xx=piece.x+x,yy=piece.y+y;if(yy<0)topped=true;else if(xx>=0&&xx<W&&yy<H)board[yy][xx]=piece.t}if(topped){gameOver();return}const rows=[];for(let y=0;y<H;y++)if(board[y].every(Boolean))rows.push(y);placeSound(rows.length?0.65:1);if(rows.length){piece=null;beginClear(rows)}else{haptic('lock');spawn()}}
-function beginClear(rows){const n=rows.length;lockDelay=true;const duration=[0,700,820,980,1350][n]||760;clearAnim={rows:rows.slice(),start:performance.now(),duration,n};lineSound(n);haptic('line'+n);showClearBanner(n);makeParticles(rows,n);setTimeout(()=>finishClear(rows,n),duration)}
+function beginClear(rows){const n=rows.length;lockDelay=true;const duration=[0,500,610,750,1060][n]||610;clearAnim={rows:rows.slice(),start:performance.now(),duration,n};lineSound(n);haptic('line'+n);showClearBanner(n);makeParticles(rows,n);setTimeout(()=>finishClear(rows,n),duration)}
 function finishClear(rows,n){for(const y of rows.slice().sort((a,b)=>b-a)){board.splice(y,1);board.unshift(Array(W).fill(null))}score+=[0,100,300,500,800][n]*level;lines+=n;level=1+Math.floor(lines/10);updateHud();clearAnim=null;lockDelay=false;spawn()}
 function showClearBanner(n){const b=$('lineBanner'),f=$('clearFlash'),wrap=$('boardWrap');b.textContent=['','SINGLE!','DOUBLE!','TRIPLE!','TETRIS!'][n]||'CLEAR!';b.className='lineBanner '+(n===4?'tetris ':'')+'show';f.className='clearFlash '+(n===4?'tetris ':'')+'show';if(n===4)wrap.classList.add('tetrisShake');setTimeout(()=>{b.className='lineBanner';f.className='clearFlash';wrap.classList.remove('tetrisShake')},n===4?1420:900)}
 function makeParticles(rows,n){const palette=n===4?['#00f6ff','#ffef27','#ff3be8','#82ff62','#fff']:['#00edff','#fff','#7a8cff'];particles=[];for(const y of rows)for(let i=0;i<(n===4?34:16);i++)particles.push({x:Math.random()*300,y:y*S+S/2,vx:(Math.random()-.5)*(n===4?5:3),vy:(Math.random()-.75)*(n===4?6:4),life:1,color:palette[(Math.random()*palette.length)|0]})}
@@ -370,12 +433,74 @@ $('musicFiles').addEventListener('change',async e=>{await addMusicFiles(Array.fr
 $('sfxOn').addEventListener('change',e=>{prefs.sfx=e.target.checked;putStore('sfxEnabled',prefs.sfx)});
 $('ghostOn').addEventListener('change',e=>{prefs.ghost=e.target.checked;putStore('ghostEnabled',prefs.ghost)});
 $('hapticLevel').addEventListener('change',e=>{prefs.haptic=Number(e.target.value);putStore('hapticStrength',prefs.haptic);haptic('rotate')});
+$('controlMode').addEventListener('change',e=>{
+ prefs.controls=e.target.value;putStore('controlMode',prefs.controls);
+ clearButtonRepeat();applyControlMode();
+});
+$('rotationSnap').addEventListener('change',e=>{
+ prefs.rotationSnap=e.target.value;putStore('rotationSnap',prefs.rotationSnap);
+});
 $('musicBtn').innerHTML=(prefs.music?'♫':'♩')+'&nbsp;&nbsp;Music On/Off';
 $('holdPanel').addEventListener('click',e=>{e.stopPropagation();holdPiece()});
-let sx=0,sy=0,lastX=0,lastY=0,startTime=0,moved=false,gestureAxis=null;
-canvas.addEventListener('pointerdown',e=>{if(!canPlay())return;audio();sx=lastX=e.clientX;sy=lastY=e.clientY;startTime=performance.now();moved=false;gestureAxis=null;canvas.setPointerCapture?.(e.pointerId)});
-canvas.addEventListener('pointermove',e=>{if(!canPlay())return;const r=canvas.getBoundingClientRect(),cell=r.width/10,totalX=e.clientX-sx,totalY=e.clientY-sy,dx=e.clientX-lastX,dy=e.clientY-lastY;if(!gestureAxis){if(totalY>cell*.32&&totalY>Math.abs(totalX)*1.18)gestureAxis='y';else if(Math.abs(totalX)>cell*.48&&Math.abs(totalX)>Math.abs(totalY)*1.25)gestureAxis='x'}if(gestureAxis==='x'&&Math.abs(dx)>=cell*.72){const active=piece,steps=Math.max(1,Math.floor(Math.abs(dx)/cell));for(let i=0;i<steps&&piece===active;i++)move(dx>0?1:-1);lastX=e.clientX;moved=true}else if(gestureAxis==='y'&&dy>=cell*.72){const active=piece,steps=Math.max(1,Math.floor(dy/cell));for(let i=0;i<steps&&piece===active&&performance.now()>=inputLockUntil;i++)softDrop(true);lastY=e.clientY;moved=true}});
-canvas.addEventListener('pointerup',e=>{if(!canPlay())return;const totalY=e.clientY-sy,dt=performance.now()-startTime;if(gestureAxis==='y'&&totalY>72&&dt<360){hardDrop();moved=true}else if(totalY<-42&&gestureAxis!=='y'){holdPiece();moved=true}if(!moved)rotate();gestureAxis=null});
+let sx=0,sy=0,lastX=0,lastY=0,startTime=0,moved=false,gestureAxis=null,dragStepX=0;
+let controlRepeatTimer=null,controlDelayTimer=null,activeControl=null;
+function clearButtonRepeat(){
+  if(controlDelayTimer){clearTimeout(controlDelayTimer);controlDelayTimer=null}
+  if(controlRepeatTimer){clearInterval(controlRepeatTimer);controlRepeatTimer=null}
+  if(activeControl){activeControl.classList.remove('pressed');activeControl=null}
+}
+const controlActions={left:()=>move(-1),right:()=>move(1),rotate:()=>rotate(),down:()=>softDrop(true),hold:()=>holdPiece(),drop:()=>hardDrop()};
+document.querySelectorAll('#buttonControls button').forEach(button=>{
+  button.addEventListener('pointerdown',e=>{
+    if(prefs.controls!=='buttons')return;
+    e.preventDefault();clearButtonRepeat();
+    audio();activeControl=button;button.classList.add('pressed');
+    try{button.setPointerCapture(e.pointerId)}catch(err){}
+    const action=controlActions[button.dataset.control];
+    if(action)action();
+    if(['left','right','down'].includes(button.dataset.control)){
+      controlDelayTimer=setTimeout(()=>{
+        controlDelayTimer=null;controlRepeatTimer=setInterval(()=>{
+          if(prefs.controls==='buttons'&&canPlay())action();
+          else clearButtonRepeat();
+        },button.dataset.control==='down'?65:70);
+      },145);
+    }
+  });
+  button.addEventListener('pointerup',clearButtonRepeat);
+  button.addEventListener('pointercancel',clearButtonRepeat);
+  button.addEventListener('lostpointercapture',clearButtonRepeat);
+});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)clearButtonRepeat()});
+canvas.addEventListener('pointerdown',e=>{if(prefs.controls!=='swipe'||!canPlay())return;audio();sx=lastX=e.clientX;sy=lastY=e.clientY;startTime=performance.now();moved=false;dragStepX=0;gestureAxis=null;canvas.setPointerCapture?.(e.pointerId)});
+canvas.addEventListener('pointermove',e=>{
+ if(prefs.controls!=='swipe'||!canPlay())return;
+ const rect=canvas.getBoundingClientRect(),cell=rect.width/10;
+ const totalX=e.clientX-sx,totalY=e.clientY-sy,dy=e.clientY-lastY;
+ if(!gestureAxis){
+  if(totalY>cell*.32&&totalY>Math.abs(totalX)*1.18)gestureAxis='y';
+  else if(Math.abs(totalX)>cell*.40&&Math.abs(totalX)>Math.abs(totalY)*1.15)gestureAxis='x';
+ }
+ if(gestureAxis==='x'){
+  const count=Math.abs(totalX)<cell*.40?0:1+Math.floor((Math.abs(totalX)-cell*.40)/(cell*.82));
+  const target=Math.sign(totalX)*count;let n=0;
+  while(dragStepX!==target&&n++<10){
+   const delta=Math.sign(target-dragStepX);
+   if(!move(delta))break;dragStepX+=delta;moved=true;
+  }
+ }else if(gestureAxis==='y'&&dy>=cell*.56){
+  const active=piece,steps=Math.max(1,Math.floor(dy/(cell*.62)));
+  for(let i=0;i<steps&&piece===active&&performance.now()>=inputLockUntil;i++)softDrop(true);
+  lastY=e.clientY;moved=true;
+ }
+});
+canvas.addEventListener('pointerup',e=>{
+ if(prefs.controls!=='swipe'||!canPlay())return;
+ const totalY=e.clientY-sy,dt=performance.now()-startTime;
+ if(gestureAxis==='y'&&totalY>70&&dt<340){hardDrop();moved=true}
+ else if(totalY<-42&&gestureAxis!=='y'){holdPiece();moved=true}
+ if(!moved)rotate();gestureAxis=null;
+});
 document.addEventListener('keydown',e=>{const m={ArrowLeft:()=>move(-1),ArrowRight:()=>move(1),ArrowUp:rotate,ArrowDown:()=>softDrop(true),' ':hardDrop,c:holdPiece,C:holdPiece};if(m[e.key]){e.preventDefault();m[e.key]()}if(e.key==='Escape'||e.key==='p')togglePause()});
 updateHud();drawPreviews();resizeBoard();renderMusicList();
 })();
