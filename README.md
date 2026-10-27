@@ -1,37 +1,40 @@
 # Neon Blocks
 
-An original **offline Android falling-block puzzle** with neon graphics, levels, scoring, ghost pieces, hold, next queue, touch/swipe gestures, and on-screen controls.
+An offline Android WebView falling-block game with a 10×20 board, bright neon blocks, touch gestures, Hold, Next, ghost, haptic feedback, score progression, and line-clear animations.
 
-## Install the APK
+## Android builds
 
-1. Open [GitHub Actions — Build Android APK](https://github.com/Yaushi420/Neon-Blocks/actions/workflows/android.yml).
-2. Select the most recent **successful** run.
-3. Under **Artifacts**, download **Neon-Blocks-APK**.
-4. Extract the downloaded ZIP and install `app-debug.apk` on your Android phone. You may need to allow installation from your file manager.
+The existing [Android GitHub Actions workflow](https://github.com/Yaushi420/Neon-Blocks/actions/workflows/android.yml) builds a debug APK on pushes to `main`. The APK uses the GitHub runner's debug signing certificate, **which may differ across build runs**. A newer APK must use the same certificate to update over an installed version.
 
-The APK is a debug build, signed automatically by the Android debug keystore. A production release would require a separate signing key.
+## Gameplay and scores
 
-## Music Library
+Tap rotates. Swipe left/right moves. Swipe down soft-drops; a fast downward flick or double-tap animates the hard drop. Swipe up or tap Hold to save the piece. The game has a short grace period after hard drops, a top-right menu, sound options, and seven random selectable tracks.
 
-Open the **♫** menu to:
-- Enable or disable individual songs without deleting them.
-- Choose **Play through** or **Shuffle**.
-- Skip to the next track or preview a selected sequence.
-- Import multiple MP3, M4A, OGG, WAV, or other Android-supported audio files from your phone.
-- Remove imported tracks entirely when desired.
+After each run you can enter a name for an **on-device leaderboard** (top 30). Scores are stored locally in the WebView and are not synchronized between devices.
 
-Imported files are copied into private offline app storage (IndexedDB within Android WebView). Clearing the app's data or uninstalling it also removes this music library. Import depends on your Android WebView supporting this storage API.
+## Soundtrack
 
-Four original synthesized takes on the public-domain folk melody **Korobeiniki** ship with the game: Arcade Classic, Neon Synthwave, 8-Bit Remix, and Dance Pulse. These are newly synthesized interpretations, not recordings extracted from the official Tetris game.
+Seven built-in slots: Pixel Classic, Neon Drive, Cinematic Rise, Battle 99, Swing Shift, Hardbass Rush, and Neon Reactor.
 
-The game does not need network connectivity and declares no Internet permission.
+Each built-in track uses **two files**:
+- `app/src/main/assets/music/<track_id>_intro.m4a` (opening + first main passage, once)
+- `app/src/main/assets/music/<track_id>_loop.m4a` (repeatable main passage)
 
-## Controls
+The game also supports per-track enable/disable, an individual max speed, TEST MAX, random track selection per run, and importing songs locally.
 
-Swipe left/right to move; swipe down to drop; swipe up or tap to rotate; double tap to hard drop. Alternatively use the six visible on-screen buttons. Hold is limited to once per placed piece. Settings include music, sound effects, vibration, and the ghost piece.
+**Repository limitation:** The seven uploaded commercial/remix recordings and derived 14 audio files are *not stored in this public GitHub repository*. When absent, `tools/generate_soundtrack.py` generates 14 placeholder files before GitHub's Android build. The locally packaged Original Soundtrack APK in the chat is different from a standard GitHub debug artifact until these replacements are provided.
 
-## Build
+The selected loop points and repeat lengths are documented in `soundtrack/loop_points.json`. To recreate the original files with the required permission to use and redistribute the recordings:
 
-The workflow uses JDK 17, Gradle 8.9, Android Gradle Plugin 8.7.3 and Android SDK 35. Pushes to `main` trigger automatic builds. You can also launch a run with **Run workflow**.
+1. Supply seven source .m4a files in `soundtrack-sources/`, with filename prefixes matching the `source` field in `soundtrack/loop_points.json`.
+2. Install Python numpy and FFmpeg, then run `python3 tools/segment_original_music.py`.
+3. Verify the 14 files are present in `app/src/main/assets/music/`. GitHub Actions preserves existing music files and only fills in missing slots with placeholders.
+4. Build using the existing Android workflow. For update installation, use the same private signing key as the user's installed APK.
 
-This independent game is **not affiliated with Tetris Holding** or the official Tetris mobile app.
+The original inputs remain unchanged. Check each recording's rights before publishing the audio or distributing an APK publicly.
+
+## Implementation
+
+Android SDK 35, Java 17, Gradle build system. The app uses local WebView storage and declares no Internet permission.
+
+This independent project is not affiliated with Tetris Holding or the official Tetris mobile app.
