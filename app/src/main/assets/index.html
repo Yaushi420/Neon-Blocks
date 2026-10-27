@@ -41,6 +41,19 @@ button{font:inherit;color:inherit}
 .panel{max-width:430px;margin:0 auto;background:#11156f;border:1px solid #5668df;border-radius:8px;padding:16px}
 .panel h2{margin:0 0 10px}.row{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:50px;border-bottom:1px solid #343ca4}.row input{width:22px;height:22px;accent-color:#00dcef}.sub{width:100%;min-height:48px;margin-top:16px;border:1px solid #6478ee;border-radius:6px;background:#242a9c;color:#fff;font-weight:900}
 .hint{font-size:11px;color:#a9b7ef;line-height:1.45;margin:10px 0 0}
+.row select{min-width:118px;background:#242a9c;color:#fff;border:1px solid #6478ee;border-radius:5px;padding:7px}
+.lineBanner{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%) scale(.7);z-index:9;pointer-events:none;font-weight:1000;font-size:28px;letter-spacing:2px;color:#fff;opacity:0;text-shadow:0 0 8px #fff,0 0 18px #00eaff,0 0 28px #7d39ff}
+.lineBanner.show{animation:linePop .48s ease-out both}
+.lineBanner.tetris{font-size:42px;color:#fff26a;text-shadow:0 0 7px #fff,0 0 15px #ffe100,0 0 30px #ff6400,0 0 44px #ff00e6;animation:tetrisPop .75s ease-out both}
+.clearFlash{position:absolute;inset:0;z-index:8;pointer-events:none;opacity:0;background:linear-gradient(180deg,#ffffff22,#00eaff33 45%,#ff4df044);mix-blend-mode:screen}
+.clearFlash.show{animation:flashPulse .36s ease-out}
+.clearFlash.tetris{animation:tetrisFlash .7s ease-out}
+.boardWrap.tetrisShake{animation:tetrisShake .5s ease-out}
+@keyframes linePop{0%{opacity:0;transform:translate(-50%,-50%) scale(.45)}28%{opacity:1;transform:translate(-50%,-50%) scale(1.16)}100%{opacity:0;transform:translate(-50%,-56%) scale(.95)}}
+@keyframes tetrisPop{0%{opacity:0;transform:translate(-50%,-50%) scale(.3) rotate(-5deg)}22%{opacity:1;transform:translate(-50%,-50%) scale(1.28) rotate(2deg)}55%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-62%) scale(1.12)}}
+@keyframes flashPulse{0%{opacity:0}30%{opacity:.85}100%{opacity:0}}
+@keyframes tetrisFlash{0%{opacity:0}12%{opacity:1;background:#fff}28%{opacity:.78;background:#00eaff}46%{opacity:.68;background:#ff42df}100%{opacity:0}}
+@keyframes tetrisShake{0%,100%{transform:translateX(0)}15%{transform:translateX(-4px)}30%{transform:translateX(5px)}45%{transform:translateX(-3px)}60%{transform:translateX(3px)}75%{transform:translateX(-1px)}}
 @media(max-height:650px){.hud{min-height:42px;grid-template-columns:1fr 1fr 1.15fr 42px}.menuToggle{width:42px;min-height:42px}.hudBox b{font-size:16px}.hudBox small{font-size:7px}.floating{width:43px}.cover h2{font-size:24px}}
 </style>
 </head>
@@ -54,7 +67,7 @@ button{font:inherit;color:inherit}
       <button id="menuToggle" class="menuToggle" aria-label="Menu">☰</button>
       <div id="quickMenu" class="quickMenu">
         <button id="pauseBtn">Ⅱ&nbsp;&nbsp;Pause</button>
-        <button id="soundBtn">🔊&nbsp;&nbsp;Sound</button>
+        <button id="musicBtn">♫&nbsp;&nbsp;Music</button>
         <button id="settingsBtn">⚙&nbsp;&nbsp;Settings</button>
       </div>
     </div>
@@ -64,14 +77,14 @@ button{font:inherit;color:inherit}
       <canvas id="board" width="300" height="600"></canvas>
       <div id="holdPanel" class="floating"><small>HOLD</small><canvas id="hold" width="100" height="82"></canvas></div>
       <div id="nextPanel" class="floating"><small>NEXT</small><canvas id="next" width="100" height="222"></canvas></div>
-      <div class="cover" id="cover"><div><h2 id="coverTitle">NEON BLOCKS</h2><p id="coverText">Tap to rotate · swipe to move/drop<br>Swipe up to hold · double tap to hard drop</p><button class="primary" id="start">PLAY</button></div></div>
+      <div id="clearFlash" class="clearFlash"></div><div id="lineBanner" class="lineBanner"></div><div class="cover" id="cover"><div><h2 id="coverTitle">NEON BLOCKS</h2><p id="coverText">Tap to rotate · swipe to move/drop<br>Swipe up to hold · double tap to hard drop</p><button class="primary" id="start">PLAY</button></div></div>
     </div>
   </div>
 </div>
 <div class="screen" id="settingsScreen"><div class="panel"><h2>Settings</h2>
-  <div class="row"><label for="sfxOn">Sound effects</label><input id="sfxOn" type="checkbox" checked></div>
+  <div class="row"><label for="musicOn">Music</label><input id="musicOn" type="checkbox" checked></div><div class="row"><label for="sfxOn">Sound effects</label><input id="sfxOn" type="checkbox" checked></div>
   <div class="row"><label for="ghostOn">Ghost piece</label><input id="ghostOn" type="checkbox" checked></div>
-  <div class="row"><label for="vibeOn">Vibration</label><input id="vibeOn" type="checkbox" checked></div>
+  <div class="row"><label for="hapticLevel">Haptic feedback</label><select id="hapticLevel"><option value="0">Off</option><option value="1">Light</option><option value="2">Medium</option><option value="3">Strong</option></select></div>
   <p class="hint">Controls: tap = rotate, swipe left/right = move, swipe down = soft drop, quick downward flick or double tap = hard drop, swipe up or tap HOLD = hold piece.</p>
   <button class="sub" id="settingsDone">DONE</button>
 </div></div>
@@ -83,12 +96,12 @@ const W=10,H=20,S=30;
 const SHAPES={I:[[0,1],[1,1],[2,1],[3,1]],O:[[1,0],[2,0],[1,1],[2,1]],T:[[1,0],[0,1],[1,1],[2,1]],S:[[1,0],[2,0],[0,1],[1,1]],Z:[[0,0],[1,0],[1,1],[2,1]],J:[[0,0],[0,1],[1,1],[2,1]],L:[[2,0],[0,1],[1,1],[2,1]]};
 const COLORS={I:'#00dff1',O:'#ffd41a',T:'#b348ff',S:'#00e778',Z:'#ff334f',J:'#3585ff',L:'#ff9d00'};
 const TYPES=Object.keys(SHAPES);
-let board=[],queue=[],bag=[],piece=null,held=null,holdUsed=false,score=0,lines=0,level=1,best=0,started=false,paused=false,over=false,counting=false,dropAcc=0,previous=performance.now(),modalPause=false;
+let board=[],queue=[],bag=[],piece=null,held=null,holdUsed=false,score=0,lines=0,level=1,best=0,started=false,paused=false,over=false,counting=false,dropAcc=0,previous=performance.now(),modalPause=false,lockDelay=false,clearAnim=null,particles=[];
 function getStore(k,d){try{const v=localStorage.getItem(k);return v===null?d:JSON.parse(v)}catch(e){return d}}
 function putStore(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 best=getStore('high',0);
-const prefs={sfx:getStore('sfxEnabled',true),ghost:getStore('ghostEnabled',true),vibrate:getStore('vibrateEnabled',true)};
-$('sfxOn').checked=prefs.sfx;$('ghostOn').checked=prefs.ghost;$('vibeOn').checked=prefs.vibrate;
+const prefs={music:getStore('musicEnabled',true),sfx:getStore('sfxEnabled',true),ghost:getStore('ghostEnabled',true),haptic:Number(getStore('hapticStrength',1))};
+$('musicOn').checked=prefs.music;$('sfxOn').checked=prefs.sfx;$('ghostOn').checked=prefs.ghost;$('hapticLevel').value=String(prefs.haptic);
 function resizeBoard(){const area=$('gameArea').getBoundingClientRect();if(area.width<=0||area.height<=0)return;const w=Math.floor(Math.min(area.width,area.height/2));const h=w*2;const wrap=$('boardWrap');wrap.style.width=w+'px';wrap.style.height=h+'px'}
 window.addEventListener('resize',resizeBoard);requestAnimationFrame(resizeBoard);
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
@@ -97,28 +110,37 @@ function make(t){return {t,x:3,y:-1,blocks:SHAPES[t].map(p=>p.slice())}}
 function fits(p,dx=0,dy=0,blocks=p.blocks){return blocks.every(([x,y])=>{const xx=p.x+x+dx,yy=p.y+y+dy;return xx>=0&&xx<W&&yy<H&&(yy<0||!board[yy][xx])})}
 function spawn(){piece=make(take());holdUsed=false;if(!fits(piece)){gameOver();return}drawPreviews()}
 function updateHud(){if(score>best){best=score;putStore('high',best)}$('score').textContent=score.toLocaleString();$('lines').textContent=String(lines);$('level').textContent=String(level)}
-function newGameState(){board=Array.from({length:H},()=>Array(W).fill(null));queue=[];bag=[];piece=null;held=null;holdUsed=false;score=0;lines=0;level=1;dropAcc=0;over=false;paused=false;started=true;counting=false;updateHud();spawn();previous=performance.now()}
+function newGameState(){board=Array.from({length:H},()=>Array(W).fill(null));queue=[];bag=[];piece=null;held=null;holdUsed=false;score=0;lines=0;level=1;dropAcc=0;over=false;paused=false;started=true;counting=false;lockDelay=false;clearAnim=null;particles=[];updateHud();spawn();previous=performance.now();startMusic()}
 function cover(title,text,button){$('coverTitle').classList.remove('countdown');$('coverTitle').textContent=title;$('coverText').textContent=text;$('coverText').style.display='block';$('start').textContent=button;$('start').style.display='inline-block';$('cover').classList.remove('hidden')}
 function hideCover(){$('cover').classList.add('hidden')}
 function countdown(){if(counting)return;counting=true;started=false;over=false;$('cover').classList.remove('hidden');$('coverText').style.display='none';$('start').style.display='none';$('coverTitle').classList.add('countdown');let n=3;$('coverTitle').textContent=n;const timer=setInterval(()=>{n--;if(n>0){$('coverTitle').textContent=n;beep(210+n*45,.055,.35)}else{clearInterval(timer);$('coverTitle').classList.remove('countdown');$('coverText').style.display='block';$('start').style.display='inline-block';newGameState();hideCover();beep(460,.08,.55)}},650)}
-function move(dx){if(!canPlay())return false;if(fits(piece,dx,0)){piece.x+=dx;beep(150,.025,.14);return true}return false}
+function move(dx){if(!canPlay())return false;if(fits(piece,dx,0)){piece.x+=dx;beep(150,.025,.14);haptic('move');return true}return false}
 function rotated(blocks){return blocks.map(([x,y])=>[3-y,x])}
-function rotate(){if(!canPlay())return;const r=rotated(piece.blocks);for(const dx of [0,-1,1,-2,2])for(const dy of [0,-1,-2])if(fits(piece,dx,dy,r)){piece.x+=dx;piece.y+=dy;piece.blocks=r;beep(280,.045,.22);return}}
+function rotate(){if(!canPlay())return;const r=rotated(piece.blocks);for(const dx of [0,-1,1,-2,2])for(const dy of [0,-1,-2])if(fits(piece,dx,dy,r)){piece.x+=dx;piece.y+=dy;piece.blocks=r;beep(280,.045,.22);haptic('rotate');return}}
 function softDrop(manual=true){if(!canPlay())return;if(fits(piece,0,1)){piece.y++;if(manual){score++;updateHud()}}else lockPiece()}
-function hardDrop(){if(!canPlay())return;let d=0;while(fits(piece,0,1)){piece.y++;d++}score+=d*2;beep(190,.055,.34);vibe(22);lockPiece()}
-function holdPiece(){if(!canPlay()||holdUsed)return;const t=piece.t;if(held===null){held=t;piece=make(take())}else{piece=make(held);held=t}holdUsed=true;if(!fits(piece)){gameOver();return}beep(330,.05,.25);drawPreviews()}
-function canPlay(){return started&&!paused&&!over&&!counting&&piece}
-function lockPiece(){let topped=false;for(const [x,y] of piece.blocks){const xx=piece.x+x,yy=piece.y+y;if(yy<0)topped=true;else if(xx>=0&&xx<W&&yy<H)board[yy][xx]=piece.t}if(topped){gameOver();return}let cleared=0;for(let y=H-1;y>=0;){if(board[y].every(Boolean)){board.splice(y,1);board.unshift(Array(W).fill(null));cleared++}else y--}if(cleared){score+=[0,100,300,500,800][cleared]*level;lines+=cleared;level=1+Math.floor(lines/10);lineSound(cleared);vibe(28)}else beep(118,.035,.18);updateHud();spawn()}
-function gameOver(){over=true;started=false;piece=null;beep(92,.2,.28);cover('GAME OVER','Score '+score.toLocaleString()+' · Best '+best.toLocaleString(),'RESTART')}
-function togglePause(){if(!started||over||counting)return;paused=!paused;$('pauseBtn').innerHTML=paused?'▶&nbsp;&nbsp;Resume':'Ⅱ&nbsp;&nbsp;Pause';if(paused)cover('PAUSED','Tap resume to continue','RESUME');else{hideCover();previous=performance.now()}}
+function hardDrop(){if(!canPlay())return;let d=0;while(fits(piece,0,1)){piece.y++;d++}score+=d*2;beep(190,.055,.34);haptic('hard');lockPiece()}
+function holdPiece(){if(!canPlay()||holdUsed)return;const t=piece.t;if(held===null){held=t;piece=make(take())}else{piece=make(held);held=t}holdUsed=true;if(!fits(piece)){gameOver();return}beep(330,.05,.25);haptic('hold');drawPreviews()}
+function canPlay(){return started&&!paused&&!over&&!counting&&!lockDelay&&piece}
+function lockPiece(){let topped=false;for(const [x,y] of piece.blocks){const xx=piece.x+x,yy=piece.y+y;if(yy<0)topped=true;else if(xx>=0&&xx<W&&yy<H)board[yy][xx]=piece.t}if(topped){gameOver();return}const rows=[];for(let y=0;y<H;y++)if(board[y].every(Boolean))rows.push(y);if(rows.length){piece=null;beginClear(rows)}else{beep(118,.035,.18);haptic('lock');spawn()}}
+function beginClear(rows){const n=rows.length;lockDelay=true;const duration=n===4?680:380;clearAnim={rows:rows.slice(),start:performance.now(),duration,n};lineSound(n);haptic('line'+n);showClearBanner(n);makeParticles(rows,n);setTimeout(()=>finishClear(rows,n),duration)}
+function finishClear(rows,n){for(const y of rows.slice().sort((a,b)=>b-a)){board.splice(y,1);board.unshift(Array(W).fill(null))}score+=[0,100,300,500,800][n]*level;lines+=n;level=1+Math.floor(lines/10);updateHud();clearAnim=null;lockDelay=false;spawn()}
+function showClearBanner(n){const b=$('lineBanner'),f=$('clearFlash'),wrap=$('boardWrap');b.textContent=['','SINGLE!','DOUBLE!','TRIPLE!','TETRIS!'][n]||'CLEAR!';b.className='lineBanner '+(n===4?'tetris ':'')+'show';f.className='clearFlash '+(n===4?'tetris ':'')+'show';if(n===4)wrap.classList.add('tetrisShake');setTimeout(()=>{b.className='lineBanner';f.className='clearFlash';wrap.classList.remove('tetrisShake')},n===4?760:500)}
+function makeParticles(rows,n){const palette=n===4?['#00f6ff','#ffef27','#ff3be8','#82ff62','#fff']:['#00edff','#fff','#7a8cff'];particles=[];for(const y of rows)for(let i=0;i<(n===4?34:16);i++)particles.push({x:Math.random()*300,y:y*S+S/2,vx:(Math.random()-.5)*(n===4?5:3),vy:(Math.random()-.75)*(n===4?6:4),life:1,color:palette[(Math.random()*palette.length)|0]})}
+function gameOver(){over=true;started=false;piece=null;stopMusic();beep(92,.2,.28);haptic('over');cover('GAME OVER','Score '+score.toLocaleString()+' · Best '+best.toLocaleString(),'RESTART')}
+function togglePause(){if(!started||over||counting)return;paused=!paused;$('pauseBtn').innerHTML=paused?'▶&nbsp;&nbsp;Resume':'Ⅱ&nbsp;&nbsp;Pause';if(paused){stopMusic();cover('PAUSED','Tap resume to continue','RESUME')}else{hideCover();previous=performance.now();startMusic()}}
 window.togglePause=togglePause;
-function vibe(ms){if(prefs.vibrate&&navigator.vibrate)navigator.vibrate(ms)}
-let audioCtx=null;
+function haptic(kind){const strength=Number(prefs.haptic)||0;if(strength<=0)return;try{if(window.AndroidHaptics&&AndroidHaptics.pulse){AndroidHaptics.pulse(strength,kind);return}}catch(e){}if(navigator.vibrate){const base=[0,5,9,14][strength];const patterns={move:[base],rotate:[base+2],lock:[base+4],hard:[base+7],hold:[base+3],line1:[base+6],line2:[base+7,30,base+7],line3:[base+8,25,base+8,25,base+8],line4:[18,24,28,24,42],over:[22,40,16]};navigator.vibrate(patterns[kind]||[base])}}
+let audioCtx=null,musicTimer=null,musicStep=0;
 function audio(){try{if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();audioCtx.resume().catch(()=>{});return audioCtx}catch(e){return null}}
-function beep(freq,dur=.05,vol=.2){if(!prefs.sfx)return;const a=audio();if(!a)return;const o=a.createOscillator(),g=a.createGain(),f=a.createBiquadFilter(),now=a.currentTime;o.type='sine';o.frequency.value=freq;f.type='lowpass';f.frequency.value=900;const peak=.035*vol;g.gain.setValueAtTime(.0001,now);g.gain.linearRampToValueAtTime(peak,now+.008);g.gain.exponentialRampToValueAtTime(.0001,now+dur);o.connect(f);f.connect(g);g.connect(a.destination);o.start(now);o.stop(now+dur+.02)}
-function lineSound(n){const a=[420,520,640,760];for(let i=0;i<Math.min(n+1,4);i++)setTimeout(()=>beep(a[i],.075,.34),i*42)}
-function tile(c,x,y,color,ghost=false,scale=S){const px=x*scale,py=y*scale;c.save();c.globalAlpha=ghost?.24:1;c.fillStyle=color;c.shadowBlur=ghost?0:7;c.shadowColor=color;c.fillRect(px+1,py+1,scale-2,scale-2);c.shadowBlur=0;c.strokeStyle=ghost?'#dce8ff':'#ffffff55';c.lineWidth=ghost?1.2:1;c.strokeRect(px+1.5,py+1.5,scale-3,scale-3);if(!ghost){c.fillStyle='#ffffff33';c.fillRect(px+3,py+3,scale-6,Math.max(2,scale*.09))}c.restore()}
-function drawBoard(){ctx.fillStyle='#10237e';ctx.fillRect(0,0,300,600);ctx.strokeStyle='#263ca0';ctx.lineWidth=.7;for(let x=1;x<W;x++){ctx.beginPath();ctx.moveTo(x*S,0);ctx.lineTo(x*S,600);ctx.stroke()}for(let y=1;y<H;y++){ctx.beginPath();ctx.moveTo(0,y*S);ctx.lineTo(300,y*S);ctx.stroke()}for(let y=0;y<H;y++)for(let x=0;x<W;x++)if(board[y]?.[x])tile(ctx,x,y,COLORS[board[y][x]]);if(piece&&!over){if(prefs.ghost){let d=0;while(fits(piece,0,d+1))d++;piece.blocks.forEach(([x,y])=>{if(piece.y+y+d>=0)tile(ctx,piece.x+x,piece.y+y+d,COLORS[piece.t],true)})}piece.blocks.forEach(([x,y])=>{if(piece.y+y>=0)tile(ctx,piece.x+x,piece.y+y,COLORS[piece.t])})}}
+function tone(freq,dur=.12,vol=.15,type='sine',when=null){const a=audio();if(!a)return;const t=when==null?a.currentTime:when,o=a.createOscillator(),g=a.createGain(),f=a.createBiquadFilter();o.type=type;o.frequency.value=freq;f.type='lowpass';f.frequency.value=type==='triangle'?1500:1100;const peak=.032*vol;g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(peak,t+.015);g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(f);f.connect(g);g.connect(a.destination);o.start(t);o.stop(t+dur+.03)}
+function beep(freq,dur=.05,vol=.2){if(!prefs.sfx)return;tone(freq,dur,vol,'sine')}
+const MUSIC=[261.63,329.63,392,523.25,392,329.63,293.66,369.99,440,587.33,440,369.99,246.94,329.63,392,493.88,392,329.63,220,293.66,349.23,440,349.23,293.66];
+function scheduleMusic(){if(!prefs.music||!started||paused||over){musicTimer=null;return}const a=audio();if(!a){musicTimer=setTimeout(scheduleMusic,500);return}const f=MUSIC[musicStep++%MUSIC.length],now=a.currentTime;tone(f,.34,.095,'sine',now);tone(f/2,.42,.035,'triangle',now);if(musicStep%4===1)tone(f*1.5,.2,.03,'sine',now+.08);musicTimer=setTimeout(scheduleMusic,285)}
+function startMusic(){if(!prefs.music||!started||paused||over||musicTimer)return;audio();scheduleMusic()}
+function stopMusic(){if(musicTimer){clearTimeout(musicTimer);musicTimer=null}}
+function lineSound(n){if(!prefs.sfx)return;const seq=n===4?[392,523,659,784,1047]:n===3?[392,523,659,784]:n===2?[440,587,740]:[520,700];seq.forEach((f,i)=>setTimeout(()=>beep(f,n===4?.12:.08,n===4?.55:.35),i*(n===4?48:55)))}
+function tile(c,x,y,color,ghost=false,scale=S){const px=x*scale,py=y*scale,pad=Math.max(1,scale*.055),w=scale-pad*2;c.save();c.globalAlpha=ghost?.24:1;if(ghost){c.fillStyle=color;c.fillRect(px+pad,py+pad,w,w);c.strokeStyle='#e9fbff';c.lineWidth=Math.max(1,scale*.055);c.strokeRect(px+pad+1,py+pad+1,w-2,w-2);c.restore();return}c.shadowColor=color;c.shadowBlur=Math.max(10,scale*.38);c.fillStyle=color;c.fillRect(px+pad,py+pad,w,w);c.shadowBlur=0;const grad=c.createLinearGradient(px,py,px+scale,py+scale);grad.addColorStop(0,'rgba(255,255,255,.72)');grad.addColorStop(.16,'rgba(255,255,255,.18)');grad.addColorStop(.55,'rgba(255,255,255,0)');grad.addColorStop(1,'rgba(0,0,40,.30)');c.fillStyle=grad;c.fillRect(px+pad+1,py+pad+1,w-2,w-2);c.strokeStyle='rgba(255,255,255,.72)';c.lineWidth=Math.max(1,scale*.045);c.beginPath();c.moveTo(px+pad+2,py+scale-pad-2);c.lineTo(px+pad+2,py+pad+2);c.lineTo(px+scale-pad-2,py+pad+2);c.stroke();c.strokeStyle='rgba(0,0,40,.42)';c.beginPath();c.moveTo(px+scale-pad-2,py+pad+3);c.lineTo(px+scale-pad-2,py+scale-pad-2);c.lineTo(px+pad+3,py+scale-pad-2);c.stroke();c.strokeStyle='rgba(255,255,255,.20)';c.lineWidth=1;c.strokeRect(px+pad+3,py+pad+3,w-6,w-6);c.restore()}
+function drawBoard(){ctx.fillStyle='#10237e';ctx.fillRect(0,0,300,600);ctx.strokeStyle='#263ca0';ctx.lineWidth=.7;for(let x=1;x<W;x++){ctx.beginPath();ctx.moveTo(x*S,0);ctx.lineTo(x*S,600);ctx.stroke()}for(let y=1;y<H;y++){ctx.beginPath();ctx.moveTo(0,y*S);ctx.lineTo(300,y*S);ctx.stroke()}for(let y=0;y<H;y++)for(let x=0;x<W;x++)if(board[y]?.[x])tile(ctx,x,y,COLORS[board[y][x]]);if(clearAnim){const p=Math.min(1,(performance.now()-clearAnim.start)/clearAnim.duration),pulse=.42+.58*Math.abs(Math.sin(p*Math.PI*(clearAnim.n===4?8:5)));for(const y of clearAnim.rows){ctx.save();ctx.globalAlpha=pulse;ctx.fillStyle=clearAnim.n===4?'#fff8a8':'#d9ffff';ctx.shadowColor=clearAnim.n===4?'#ff42ed':'#00eeff';ctx.shadowBlur=clearAnim.n===4?28:18;ctx.fillRect(0,y*S+2,300,S-4);ctx.restore()}}if(particles.length){for(const q of particles){q.x+=q.vx;q.y+=q.vy;q.vy+=.12;q.life-=.025;if(q.life>0){ctx.save();ctx.globalAlpha=q.life;ctx.fillStyle=q.color;ctx.shadowColor=q.color;ctx.shadowBlur=10;ctx.fillRect(q.x,q.y,3.5,3.5);ctx.restore()}}particles=particles.filter(q=>q.life>0)}if(piece&&!over){if(prefs.ghost){let d=0;while(fits(piece,0,d+1))d++;piece.blocks.forEach(([x,y])=>{if(piece.y+y+d>=0)tile(ctx,piece.x+x,piece.y+y+d,COLORS[piece.t],true)})}piece.blocks.forEach(([x,y])=>{if(piece.y+y>=0)tile(ctx,piece.x+x,piece.y+y,COLORS[piece.t])})}}
 function preview(c,t,yOffset=0){if(!t)return;const b=SHAPES[t],xs=b.map(v=>v[0]),ys=b.map(v=>v[1]),l=Math.min(...xs),r=Math.max(...xs),top=Math.min(...ys),sz=18,ox=(100-(r-l+1)*sz)/2,oy=yOffset+5;for(const [x,y] of b){c.save();c.translate(ox,oy);tile(c,x-l,y-top,COLORS[t],false,sz);c.restore()}}
 function drawPreviews(){hc.clearRect(0,0,100,82);nc.clearRect(0,0,100,222);preview(hc,held,10);for(let i=0;i<3;i++)preview(nc,queue[i],i*70+3)}
 function loop(now){requestAnimationFrame(loop);if(canPlay()){dropAcc+=Math.min(now-previous,250);const interval=Math.max(65,820*Math.pow(.82,level-1));if(dropAcc>=interval){softDrop(false);dropAcc-=interval}}previous=now;drawBoard()}
@@ -126,15 +148,16 @@ requestAnimationFrame(loop);
 $('start').addEventListener('click',()=>{audio();if(paused){togglePause();return}countdown()});
 $('pauseBtn').addEventListener('click',()=>{togglePause();$('quickMenu').classList.remove('open')});
 $('menuToggle').addEventListener('click',e=>{e.stopPropagation();$('quickMenu').classList.toggle('open')});
-$('soundBtn').addEventListener('click',()=>{prefs.sfx=!prefs.sfx;putStore('sfxEnabled',prefs.sfx);$('sfxOn').checked=prefs.sfx;$('soundBtn').innerHTML=(prefs.sfx?'🔊':'🔇')+'&nbsp;&nbsp;Sound';if(prefs.sfx)beep(440,.06,.35)});
+$('musicBtn').addEventListener('click',()=>{prefs.music=!prefs.music;putStore('musicEnabled',prefs.music);$('musicOn').checked=prefs.music;$('musicBtn').innerHTML=(prefs.music?'♫':'♩')+'&nbsp;&nbsp;Music';if(prefs.music)startMusic();else stopMusic()});
 $('settingsBtn').addEventListener('click',()=>{$('quickMenu').classList.remove('open');openSettings(true)});
 document.addEventListener('pointerdown',e=>{if(!$('quickMenu').contains(e.target)&&e.target!==$('menuToggle'))$('quickMenu').classList.remove('open')});
 function openSettings(show){$('settingsScreen').classList.toggle('show',show);if(show&&started&&!paused&&!over){modalPause=true;togglePause()}else if(!show&&modalPause){modalPause=false;if(paused)togglePause()}}
 $('settingsDone').addEventListener('click',()=>openSettings(false));
-$('sfxOn').addEventListener('change',e=>{prefs.sfx=e.target.checked;putStore('sfxEnabled',prefs.sfx);$('soundBtn').innerHTML=(prefs.sfx?'🔊':'🔇')+'&nbsp;&nbsp;Sound'});
+$('musicOn').addEventListener('change',e=>{prefs.music=e.target.checked;putStore('musicEnabled',prefs.music);$('musicBtn').innerHTML=(prefs.music?'♫':'♩')+'&nbsp;&nbsp;Music';if(prefs.music)startMusic();else stopMusic()});
+$('sfxOn').addEventListener('change',e=>{prefs.sfx=e.target.checked;putStore('sfxEnabled',prefs.sfx)});
 $('ghostOn').addEventListener('change',e=>{prefs.ghost=e.target.checked;putStore('ghostEnabled',prefs.ghost)});
-$('vibeOn').addEventListener('change',e=>{prefs.vibrate=e.target.checked;putStore('vibrateEnabled',prefs.vibrate)});
-$('soundBtn').innerHTML=(prefs.sfx?'🔊':'🔇')+'&nbsp;&nbsp;Sound';
+$('hapticLevel').addEventListener('change',e=>{prefs.haptic=Number(e.target.value);putStore('hapticStrength',prefs.haptic);haptic('rotate')});
+$('musicBtn').innerHTML=(prefs.music?'♫':'♩')+'&nbsp;&nbsp;Music';
 $('holdPanel').addEventListener('click',e=>{e.stopPropagation();holdPiece()});
 let sx=0,sy=0,lastX=0,lastY=0,startTime=0,moved=false,lastTap=0;
 canvas.addEventListener('pointerdown',e=>{if(!canPlay())return;audio();const r=canvas.getBoundingClientRect();sx=lastX=e.clientX;sy=lastY=e.clientY;startTime=performance.now();moved=false;canvas.setPointerCapture?.(e.pointerId)});
