@@ -66,7 +66,7 @@ button{font:inherit;color:inherit}
 .boardHeader{color:#89e9ff;border-bottom:1px solid #4a55c7;font-size:10px;font-weight:900;letter-spacing:.7px}.boardResult{border-bottom:1px solid #252a82;font-size:12px}.boardResult:nth-child(1){color:#ffe473;font-weight:900}.boardResult span:last-child{text-align:right;font-variant-numeric:tabular-nums;font-weight:900}.soundCheck{border:1px solid #66d8f2;border-radius:8px;background:#283993;color:#fff;padding:9px 13px;font-size:12px;font-weight:800}
 
 /* Bottom touch controls only reduce the board height while Button Mode is selected. */
-.buttonControls{display:none;flex:0 0 auto;grid-template-columns:repeat(6,minmax(0,1fr));gap:5px;padding:5px 2px 2px;user-select:none;-webkit-user-select:none;touch-action:none}
+.buttonControls{display:none;flex:0 0 auto;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;padding:5px 2px 2px;user-select:none;-webkit-user-select:none;touch-action:none}
 .buttonControls.active{display:grid}
 .controlKey{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:66px;min-width:0;padding:4px 0;border:1px solid #5f85ee;border-radius:12px;background:linear-gradient(145deg,#29339b,#11185e);box-shadow:inset 0 2px 1px #ffffff33,0 3px 0 #070936;color:#defbff;touch-action:none;cursor:pointer}
 .controlKey .keySymbol{font-size:28px;font-weight:900;line-height:1}
@@ -104,11 +104,9 @@ button{font:inherit;color:inherit}
   </div>
   <div id="buttonControls" class="buttonControls" aria-label="Touch button controls">
     <button class="controlKey" data-control="left" aria-label="Move left"><span class="keySymbol">◀</span><span class="keyLabel">LEFT</span></button>
-    <button class="controlKey" data-control="right" aria-label="Move right"><span class="keySymbol">▶</span><span class="keyLabel">RIGHT</span></button>
     <button class="controlKey rotateKey" data-control="rotate" aria-label="Rotate"><span class="keySymbol">↻</span><span class="keyLabel">ROTATE</span></button>
-    <button class="controlKey downKey" data-control="down" aria-label="Soft drop"><span class="keySymbol">▼</span><span class="keyLabel">DOWN</span></button>
-    <button class="controlKey holdKey" data-control="hold" aria-label="Hold"><span class="keySymbol">▣</span><span class="keyLabel">HOLD</span></button>
     <button class="controlKey dropKey" data-control="drop" aria-label="Hard drop"><span class="keySymbol">⤓</span><span class="keyLabel">DROP</span></button>
+    <button class="controlKey" data-control="right" aria-label="Move right"><span class="keySymbol">▶</span><span class="keyLabel">RIGHT</span></button>
   </div>
 </div>
 <div class="screen" id="settingsScreen"><div class="panel"><h2>Settings</h2>
@@ -118,7 +116,7 @@ button{font:inherit;color:inherit}
   <div class="row"><label for="hapticLevel">Haptic feedback</label><select id="hapticLevel"><option value="0">Off</option><option value="1">Light</option><option value="2">Medium</option><option value="3">Strong</option></select></div>
   <div class="row"><label for="controlMode">Control style</label><select id="controlMode"><option value="swipe">Swipe</option><option value="buttons">Buttons</option></select></div>
   <div class="row"><label for="rotationSnap">Vertical → horizontal snap</label><select id="rotationSnap"><option value="center">Center</option><option value="left">Left</option><option value="right">Right</option></select></div>
-  <p class="hint">Snap alignment sets which side of the column a straight vertical piece expands toward when rotating horizontally. A full turn returns to its original column whenever space permits. Button mode adds LEFT, RIGHT, ROTATE, DOWN, HOLD and DROP along the bottom.</p>
+  <p class="hint">Snap alignment sets which side of the column a straight vertical piece expands toward when rotating horizontally. A full turn returns to its original column whenever space permits. Button mode has LEFT, ROTATE, DROP and RIGHT along the bottom. Tap the HOLD window in the top-left to hold or swap your piece.</p>
   <p class="hint" id="musicStatus" role="status"></p><div class="musicTools" id="soundtrackLibrary"><h3>🎵 Built-in Soundtrack</h3><p class="musicLibraryLead">All seven songs are inside the app. Toggle tracks, set each maximum speed, and use TEST MAX to preview them.</p>
     <div id="musicList" class="musicList"></div>
     <h3 style="margin-top:14px">Add your own songs</h3><label class="musicUpload">＋ ADD SONGS<input id="musicFiles" type="file" accept="audio/*" multiple></label>
@@ -213,7 +211,18 @@ function holdPiece(){if(!canPlay()||holdUsed)return;const t=piece.t;if(held===nu
 function canPlay(){return started&&!paused&&!over&&!counting&&!lockDelay&&!dropAnimating&&performance.now()>=inputLockUntil&&piece}
 function lockPiece(){let topped=false;for(const [x,y] of piece.blocks){const xx=piece.x+x,yy=piece.y+y;if(yy<0)topped=true;else if(xx>=0&&xx<W&&yy<H)board[yy][xx]=piece.t}if(topped){gameOver();return}const rows=[];for(let y=0;y<H;y++)if(board[y].every(Boolean))rows.push(y);placeSound(rows.length?0.65:1);if(rows.length){piece=null;beginClear(rows)}else{haptic('lock');spawn()}}
 function beginClear(rows){const n=rows.length;lockDelay=true;const duration=[0,500,610,750,1060][n]||610;clearAnim={rows:rows.slice(),start:performance.now(),duration,n};lineSound(n);haptic('line'+n);showClearBanner(n);makeParticles(rows,n);setTimeout(()=>finishClear(rows,n),duration)}
-function finishClear(rows,n){for(const y of rows.slice().sort((a,b)=>b-a)){board.splice(y,1);board.unshift(Array(W).fill(null))}score+=[0,100,300,500,800][n]*level;lines+=n;level=1+Math.floor(lines/10);updateHud();clearAnim=null;lockDelay=false;spawn()}
+function removeCompletedRows(grid,rows){
+  // Clear the selected rows together. Unshifting inside splice loops shifted
+  // indices and caused adjacent completed lines to be removed incorrectly.
+  const clearSet=new Set(rows);
+  const remaining=grid.filter((_,y)=>!clearSet.has(y));
+  return Array.from({length:grid.length-remaining.length},()=>Array(W).fill(null)).concat(remaining);
+}
+function finishClear(rows,n){
+  board=removeCompletedRows(board,rows);
+  score+=[0,100,300,500,800][n]*level;lines+=n;level=1+Math.floor(lines/10);
+  updateHud();clearAnim=null;lockDelay=false;spawn();
+}
 function showClearBanner(n){const b=$('lineBanner'),f=$('clearFlash'),wrap=$('boardWrap');b.textContent=['','SINGLE!','DOUBLE!','TRIPLE!','TETRIS!'][n]||'CLEAR!';b.className='lineBanner '+(n===4?'tetris ':'')+'show';f.className='clearFlash '+(n===4?'tetris ':'')+'show';if(n===4)wrap.classList.add('tetrisShake');setTimeout(()=>{b.className='lineBanner';f.className='clearFlash';wrap.classList.remove('tetrisShake')},n===4?1420:900)}
 function makeParticles(rows,n){const palette=n===4?['#00f6ff','#ffef27','#ff3be8','#82ff62','#fff']:['#00edff','#fff','#7a8cff'];particles=[];for(const y of rows)for(let i=0;i<(n===4?34:16);i++)particles.push({x:Math.random()*300,y:y*S+S/2,vx:(Math.random()-.5)*(n===4?5:3),vy:(Math.random()-.75)*(n===4?6:4),life:1,color:palette[(Math.random()*palette.length)|0]})}
 function gameOver(){over=true;started=false;piece=null;stopMusic();beep(92,.2,.28);haptic('over');cover('GAME OVER','Score '+score.toLocaleString()+' · Best '+best.toLocaleString(),'RESTART');openLeaderboard(true)}
@@ -449,7 +458,7 @@ function clearButtonRepeat(){
   if(controlRepeatTimer){clearInterval(controlRepeatTimer);controlRepeatTimer=null}
   if(activeControl){activeControl.classList.remove('pressed');activeControl=null}
 }
-const controlActions={left:()=>move(-1),right:()=>move(1),rotate:()=>rotate(),down:()=>softDrop(true),hold:()=>holdPiece(),drop:()=>hardDrop()};
+const controlActions={left:()=>move(-1),right:()=>move(1),rotate:()=>rotate(),drop:()=>hardDrop()};
 document.querySelectorAll('#buttonControls button').forEach(button=>{
   button.addEventListener('pointerdown',e=>{
     if(prefs.controls!=='buttons')return;
@@ -458,12 +467,12 @@ document.querySelectorAll('#buttonControls button').forEach(button=>{
     try{button.setPointerCapture(e.pointerId)}catch(err){}
     const action=controlActions[button.dataset.control];
     if(action)action();
-    if(['left','right','down'].includes(button.dataset.control)){
+    if(['left','right'].includes(button.dataset.control)){
       controlDelayTimer=setTimeout(()=>{
         controlDelayTimer=null;controlRepeatTimer=setInterval(()=>{
           if(prefs.controls==='buttons'&&canPlay())action();
           else clearButtonRepeat();
-        },button.dataset.control==='down'?65:70);
+        },70);
       },145);
     }
   });
