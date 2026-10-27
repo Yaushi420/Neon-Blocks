@@ -7,7 +7,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       issues: write
     steps:
       - uses: actions/checkout@v4
@@ -35,7 +35,7 @@ jobs:
           path: build.log
           if-no-files-found: ignore
       - name: Report build failure to repository issue
-        if: failure() && steps.compile.outcome == 'failure'
+        if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -58,6 +58,15 @@ jobs:
           name: Neon-Blocks-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      - name: Publish directly downloadable APK
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release view debug-latest >/dev/null 2>&1 || gh release create debug-latest --target "$GITHUB_SHA" --title "Neon Blocks Android Debug APK" --notes "Latest automated debug build. For testing and sideloading only." --prerelease
+          gh release upload debug-latest app/build/outputs/apk/debug/app-debug.apk --clobber
 
       - name: Report successful APK build
         if: success()
