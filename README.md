@@ -1,14 +1,37 @@
 # Neon Blocks
 
-An original offline falling-block puzzle for Android. Modern neon visuals, touch gestures and on-screen controls, next queue, hold, ghost piece, scoring, levels, and a locally synthesized rendition of the public-domain folk tune Korobeiniki.
+An original **offline Android falling-block puzzle** with neon graphics, levels, scoring, ghost pieces, hold, next queue, touch/swipe gestures, and on-screen controls.
 
-## Download APK
-Open **Actions** in this repository, select the latest successful **Build Android APK** run, open **Artifacts**, and download **Neon-Blocks-APK**. Extract the ZIP to get `app-debug.apk`, then install it on Android (allow APK installs from your browser or file manager).
+## Install the APK
 
-## Build
-The GitHub Actions workflow automatically builds on pushes to main, using JDK 17 and Android Gradle Plugin. No Internet connection is required to play once installed.
+1. Open [GitHub Actions — Build Android APK](https://github.com/Yaushi420/Neon-Blocks/actions/workflows/android.yml).
+2. Select the most recent **successful** run.
+3. Under **Artifacts**, download **Neon-Blocks-APK**.
+4. Extract the downloaded ZIP and install `app-debug.apk` on your Android phone. You may need to allow installation from your file manager.
+
+The APK is a debug build, signed automatically by the Android debug keystore. A production release would require a separate signing key.
+
+## Music Library
+
+Open the **♫** menu to:
+- Enable or disable individual songs without deleting them.
+- Choose **Play through** or **Shuffle**.
+- Skip to the next track or preview a selected sequence.
+- Import multiple MP3, M4A, OGG, WAV, or other Android-supported audio files from your phone.
+- Remove imported tracks entirely when desired.
+
+Imported files are copied into private offline app storage (IndexedDB within Android WebView). Clearing the app's data or uninstalling it also removes this music library. Import depends on your Android WebView supporting this storage API.
+
+Four original synthesized takes on the public-domain folk melody **Korobeiniki** ship with the game: Arcade Classic, Neon Synthwave, 8-Bit Remix, and Dance Pulse. These are newly synthesized interpretations, not recordings extracted from the official Tetris game.
+
+The game does not need network connectivity and declares no Internet permission.
 
 ## Controls
-Swipe horizontally to move; swipe down to soft drop; swipe up to rotate; tap to rotate; double tap to hard drop. There are also explicit move, rotate, drop and hold buttons.
 
-This is an independent game and is not affiliated with Tetris Holding or the official Tetris app. Graphics and gameplay implementation are original. Korobeiniki is a traditional public-domain melody synthesized in-app.
+Swipe left/right to move; swipe down to drop; swipe up or tap to rotate; double tap to hard drop. Alternatively use the six visible on-screen buttons. Hold is limited to once per placed piece. Settings include music, sound effects, vibration, and the ghost piece.
+
+## Build
+
+The workflow uses JDK 17, Gradle 8.9, Android Gradle Plugin 8.7.3 and Android SDK 35. Pushes to `main` trigger automatic builds. You can also launch a run with **Run workflow**.
+
+This independent game is **not affiliated with Tetris Holding** or the official Tetris mobile app.
