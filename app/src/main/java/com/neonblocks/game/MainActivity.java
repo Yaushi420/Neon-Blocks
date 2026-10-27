@@ -106,6 +106,16 @@ public class MainActivity extends Activity {
         if(browser!=null) browser.evaluateJavascript("window.togglePause && window.togglePause()",null);
         else super.onBackPressed();
     }
+    @Override protected void onPause() {
+        if (browser != null) browser.evaluateJavascript("window.appBackground && window.appBackground()", null);
+        super.onPause();
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        if (browser != null) browser.evaluateJavascript("window.appForeground && window.appForeground()", null);
+    }
+
     @Override protected void onDestroy() {
         if(fileCallback!=null) { fileCallback.onReceiveValue(null); fileCallback=null; }
         if(browser!=null) { browser.destroy();browser=null; }
