@@ -8,6 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      issues: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -18,9 +19,41 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Install Android SDK 35
+        run: sdkmanager --install 'platforms;android-35' 'build-tools;35.0.0'
       - name: Build debug APK
-        run: gradle --no-daemon assembleDebug
-      - uses: actions/upload-artifact@v4
+        id: compile
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon --stacktrace assembleDebug 2>&1 | tee build.log
+      - name: Upload diagnostic log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Neon-Blocks-build-log
+          path: build.log
+          if-no-files-found: ignore
+      - name: Report build failure to repository issue
+        if: failure() && steps.compile.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os, re
+          log=open("build.log",errors="replace").read() if os.path.isfile("build.log") else "(no build log)"
+          hits=[x.strip() for x in log.splitlines() if re.search(r"(^\s*> Task .*FAILED|^FAILURE:|^\* What went wrong:|^Execution failed|^.* error: |^.*AAPT:|^.*Could not .*|^.*Gradle .* failed)",x,re.I)]
+          summary="\n".join(hits[-18:])[-4500:] if hits else log[-3500:]
+          body="Automated Android APK build failed.\n\nRun: "+os.environ["RUN_URL"]+"\n\nBuild error excerpt:\n\n```\n"+summary+"\n```\n\nThe full log is available in the run artifacts."
+          open("failure-report.md","w").write(body)
+          PY
+          gh issue create --repo "$REPO" --title "Neon Blocks: Android APK build failure" --body-file failure-report.md || true
+      - name: Upload installable APK
+        if: success()
+        uses: actions/upload-artifact@v4
         with:
           name: Neon-Blocks-APK
           path: app/build/outputs/apk/debug/app-debug.apk
