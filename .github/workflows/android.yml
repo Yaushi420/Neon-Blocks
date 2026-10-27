@@ -33,6 +33,12 @@ jobs:
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
+      - name: Prepare bundled intro and loop audio
+        shell: bash
+        run: |
+          python3 tools/generate_soundtrack.py
+          test "$(find app/src/main/assets/music -name '*.m4a' | wc -l)" -eq 14
+
       - name: Build debug APK
         id: compile
         shell: bash
