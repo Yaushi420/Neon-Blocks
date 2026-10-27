@@ -115,8 +115,9 @@ button{font:inherit;color:inherit}
   <div class="row"><label for="ghostOn">Ghost piece</label><input id="ghostOn" type="checkbox" checked></div>
   <div class="row"><label for="hapticLevel">Haptic feedback</label><select id="hapticLevel"><option value="0">Off</option><option value="1">Light</option><option value="2">Medium</option><option value="3">Strong</option></select></div>
   <div class="row"><label for="controlMode">Control style</label><select id="controlMode"><option value="swipe">Swipe</option><option value="buttons">Buttons</option></select></div>
+  <div class="row"><label for="buttonOrder">Button order</label><select id="buttonOrder"><option value="rotate-first">Left · Rotate · Drop · Right</option><option value="drop-first">Left · Drop · Rotate · Right</option></select></div>
   <div class="row"><label for="rotationSnap">Vertical → horizontal snap</label><select id="rotationSnap"><option value="center">Center</option><option value="left">Left</option><option value="right">Right</option></select></div>
-  <p class="hint">Snap alignment sets which side of the column a straight vertical piece expands toward when rotating horizontally. A full turn returns to its original column whenever space permits. Button mode has LEFT, ROTATE, DROP and RIGHT along the bottom. Tap the HOLD window in the top-left to hold or swap your piece.</p>
+  <p class="hint">Snap alignment sets which side of the column a straight vertical piece expands toward when rotating horizontally. A full turn returns to its original column whenever space permits. Button mode offers two layouts: LEFT · ROTATE · DROP · RIGHT or LEFT · DROP · ROTATE · RIGHT. Tap the HOLD window in the top-left to hold or swap your piece.</p>
   <p class="hint" id="musicStatus" role="status"></p><div class="musicTools" id="soundtrackLibrary"><h3>🎵 Built-in Soundtrack</h3><p class="musicLibraryLead">All seven songs are inside the app. Toggle tracks, set each maximum speed, and use TEST MAX to preview them.</p>
     <div id="musicList" class="musicList"></div>
     <h3 style="margin-top:14px">Add your own songs</h3><label class="musicUpload">＋ ADD SONGS<input id="musicFiles" type="file" accept="audio/*" multiple></label>
@@ -147,15 +148,26 @@ let board=[],queue=[],bag=[],piece=null,held=null,holdUsed=false,score=0,lines=0
 function getStore(k,d){try{const v=localStorage.getItem(k);return v===null?d:JSON.parse(v)}catch(e){return d}}
 function putStore(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 best=getStore('high',0);
-const prefs={controls:getStore('controlMode','swipe'),rotationSnap:getStore('rotationSnap','center'),music:getStore('musicEnabled',true),musicVolume:Number(getStore('musicVolume',85)),sfx:getStore('sfxEnabled',true),ghost:getStore('ghostEnabled',true),haptic:Number(getStore('hapticStrength',1)),builtins:getStore('builtinMusicEnabled',{pixel_classic:true,neon_drive:true,cinematic_rise:true,battle_99:true,swing_shift:true,hardbass_rush:true,neon_reactor:true}),maxSpeeds:getStore('builtinMusicMaxSpeeds',{})};
+const prefs={controls:getStore('controlMode','swipe'),buttonOrder:getStore('buttonOrder','rotate-first'),rotationSnap:getStore('rotationSnap','center'),music:getStore('musicEnabled',true),musicVolume:Number(getStore('musicVolume',85)),sfx:getStore('sfxEnabled',true),ghost:getStore('ghostEnabled',true),haptic:Number(getStore('hapticStrength',1)),builtins:getStore('builtinMusicEnabled',{pixel_classic:true,neon_drive:true,cinematic_rise:true,battle_99:true,swing_shift:true,hardbass_rush:true,neon_reactor:true}),maxSpeeds:getStore('builtinMusicMaxSpeeds',{})};
 $('musicOn').checked=prefs.music;$('musicVolume').value=String(prefs.musicVolume);$('sfxOn').checked=prefs.sfx;$('ghostOn').checked=prefs.ghost;$('hapticLevel').value=String(prefs.haptic);
 if(!['swipe','buttons'].includes(prefs.controls))prefs.controls='swipe';
 if(!['left','center','right'].includes(prefs.rotationSnap))prefs.rotationSnap='center';
-$('controlMode').value=prefs.controls;$('rotationSnap').value=prefs.rotationSnap;
+if(!['rotate-first','drop-first'].includes(prefs.buttonOrder))prefs.buttonOrder='rotate-first';
+$('controlMode').value=prefs.controls;$('rotationSnap').value=prefs.rotationSnap;$('buttonOrder').value=prefs.buttonOrder;
+function applyButtonOrder(){
+  const swap=prefs.buttonOrder==='drop-first';
+  const container=$('buttonControls');
+  // The order is visual only: data-control stays bound to the correct action.
+  container.querySelector('[data-control="left"]').style.order='0';
+  container.querySelector('[data-control="rotate"]').style.order=swap?'2':'1';
+  container.querySelector('[data-control="drop"]').style.order=swap?'1':'2';
+  container.querySelector('[data-control="right"]').style.order='3';
+}
+applyButtonOrder();
 function applyControlMode(){
   $('buttonControls').classList.toggle('active',prefs.controls==='buttons');
   $('coverText').textContent=prefs.controls==='buttons'
-    ?'Use the bottom buttons to move, rotate, drop, and hold.'
+    ?'Use the bottom buttons to move, rotate and drop. Tap the top-left HOLD panel to hold or swap.'
     :'Tap to rotate · swipe left/right to move · swipe down to drop · flick down to hard drop';
   requestAnimationFrame(resizeBoard);
 }
@@ -445,6 +457,11 @@ $('hapticLevel').addEventListener('change',e=>{prefs.haptic=Number(e.target.valu
 $('controlMode').addEventListener('change',e=>{
  prefs.controls=e.target.value;putStore('controlMode',prefs.controls);
  clearButtonRepeat();applyControlMode();
+});
+$('buttonOrder').addEventListener('change',e=>{
+ prefs.buttonOrder=e.target.value;
+ putStore('buttonOrder',prefs.buttonOrder);
+ clearButtonRepeat();applyButtonOrder();
 });
 $('rotationSnap').addEventListener('change',e=>{
  prefs.rotationSnap=e.target.value;putStore('rotationSnap',prefs.rotationSnap);
