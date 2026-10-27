@@ -57,7 +57,7 @@ public class MainActivity extends Activity {
     }
     private final class AudioAssetBridge {
         @JavascriptInterface public String read(String filename) {
-            if (filename == null || !filename.matches("[a-z_]+_loop\\.m4a")) return "";
+            if (filename == null || !filename.matches("[a-z0-9_]+_loop\\.m4a")) return "";
             try (InputStream in = getAssets().open("music/" + filename);
                  ByteArrayOutputStream out = new ByteArrayOutputStream()) {
                 byte[] bytes = new byte[32768];
