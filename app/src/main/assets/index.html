@@ -88,7 +88,7 @@ button{font:inherit;color:inherit}
       <canvas id="board" width="300" height="600"></canvas>
       <div id="holdPanel" class="floating"><small>HOLD</small><canvas id="hold" width="100" height="82"></canvas></div>
       <div id="nextPanel" class="floating"><small>NEXT</small><canvas id="next" width="100" height="222"></canvas></div>
-      <div id="clearFlash" class="clearFlash"></div><div id="lineBanner" class="lineBanner"></div><div class="cover" id="cover"><div><h2 id="coverTitle">NEON BLOCKS</h2><p id="coverText">Tap to rotate · swipe to move/drop<br>Swipe up to hold · double tap to hard drop</p><button class="primary" id="start">PLAY</button></div></div>
+      <div id="clearFlash" class="clearFlash"></div><div id="lineBanner" class="lineBanner"></div><div class="cover" id="cover"><div><h2 id="coverTitle">NEON BLOCKS</h2><p id="coverText">Tap to rotate · swipe to move/drop<br>Swipe up to hold · fast downward flick for hard drop</p><button class="primary" id="start">PLAY</button></div></div>
     </div>
   </div>
 </div>
@@ -102,7 +102,7 @@ button{font:inherit;color:inherit}
     <h3 style="margin-top:14px">Add your own songs</h3><label class="musicUpload">＋ ADD SONGS<input id="musicFiles" type="file" accept="audio/*" multiple></label>
     <p class="hint">Seven beat-cut built-in tracks are included. Enable or disable them below. Set a separate maximum speed for each song and use TEST MAX to preview it. Imported songs get the same speed control. One random enabled track is selected per game, and its tempo rises smoothly with the actual falling speed.</p>
   </div>
-  <p class="hint">Controls: tap = rotate, swipe left/right = move, swipe down = soft drop. Once a downward gesture is recognized, horizontal movement is locked for the rest of that swipe. Quick downward flick or double tap = animated hard drop, swipe up or tap HOLD = hold piece.</p>
+  <p class="hint">Controls: tap = rotate, swipe left/right = move, swipe down = soft drop. Once a downward gesture is recognized, horizontal movement is locked for the rest of that swipe. Quick downward flick = animated hard drop, swipe up or tap HOLD = hold piece.</p>
   <button class="sub" id="settingsDone">DONE</button>
 </div></div>
 <div class="screen" id="leaderboardScreen" aria-label="Local leaderboard"><div class="panel boardPanel">
@@ -192,6 +192,8 @@ window.appForeground=()=>{appInBackground=false;if(prefs.music&&started&&!paused
 document.addEventListener('visibilitychange',()=>{if(document.hidden)window.appBackground();else window.appForeground()});
 function haptic(kind){const strength=Number(prefs.haptic)||0;if(strength<=0)return;try{if(window.AndroidHaptics&&AndroidHaptics.pulse){AndroidHaptics.pulse(strength,kind);return}}catch(e){}if(navigator.vibrate){const base=[0,5,9,14][strength];const patterns={move:[base],rotate:[base+2],lock:[base+4],hard:[base+7],hold:[base+3],line1:[base+6],line2:[base+7,30,base+7],line3:[base+8,25,base+8,25,base+8],line4:[18,24,28,24,42],over:[22,40,16]};navigator.vibrate(patterns[kind]||[base])}}
 let audioCtx=null,bgAudio=null,bgLoopAudio=null,bgUrl=null,bgLoopSrc=null,gameTrackId=null,lastTrackId=null,appInBackground=false,lastMusicRate=1,currentMaxSpeed=1.35,testAudio=null,testUrl=null,testButton=null,musicGeneration=0;
+let loopBuffer=null,loopNode=null,loopGain=null,loopPos=0,loopClock=0,loopSpeed=1;
+let testNode=null,testGain=null,testGeneration=0;
 const BUILTIN_TRACKS=[
   {id:'pixel_classic',name:'Pixel Classic',introFile:'music/pixel_classic_intro.m4a',loopFile:'music/pixel_classic_loop.m4a',note:'chiptune baseline',defaultMax:1.35},
   {id:'neon_drive',name:'Neon Drive',introFile:'music/neon_drive_intro.m4a',loopFile:'music/neon_drive_loop.m4a',note:'techno remix',defaultMax:1.18},
@@ -214,7 +216,18 @@ else{bassHit(62,.41,1.58,.40,t);bassHit(96,.29,1.10,.43,t+.085);bassHit(132,.18,
 function fallIntervalForLevel(l=level){return Math.max(65,820*Math.pow(.82,l-1))}
 function musicProgress(){const interval=fallIntervalForLevel(),ratio=820/interval,maxRatio=820/65;const fraction=Math.max(0,Math.min(1,Math.log(ratio)/Math.log(maxRatio)));return Math.pow(fraction,.7)}
 function musicRate(){return 1+(Math.max(1,currentMaxSpeed)-1)*musicProgress()}
-function updateMusicRate(){const target=musicRate(),delta=target-lastMusicRate,rate=Math.abs(delta)<.001?target:lastMusicRate+delta*.060;lastMusicRate=rate;for(const player of [bgAudio,bgLoopAudio])if(player){try{player.playbackRate=rate;player.preservesPitch=false;player.webkitPreservesPitch=false}catch(e){}}}
+function updateMusicRate(){
+ const target=musicRate(),delta=target-lastMusicRate,rate=Math.abs(delta)<.001?target:lastMusicRate+delta*.060;
+ if(loopNode&&loopBuffer&&audioCtx){
+  loopPos=(loopPos+Math.max(0,audioCtx.currentTime-loopClock)*loopSpeed)%loopBuffer.duration;
+  loopClock=audioCtx.currentTime;loopSpeed=rate;
+  loopNode.playbackRate.setTargetAtTime(rate,audioCtx.currentTime,.055);
+ }
+ lastMusicRate=rate;
+ for(const player of [bgAudio,bgLoopAudio])if(player)try{
+  player.playbackRate=rate;player.preservesPitch=false;player.webkitPreservesPitch=false
+ }catch(e){}
+}
 function builtinMax(id){const t=BUILTIN_TRACKS.find(x=>x.id===id);const v=Number(prefs.maxSpeeds[id]);return Math.max(1,Math.min(1.60,Number.isFinite(v)?v:(t?t.defaultMax:1.35)))}
 function setBuiltinMax(id,v){prefs.maxSpeeds[id]=Math.max(1,Math.min(1.60,Number(v)||1.35));putStore('builtinMusicMaxSpeeds',prefs.maxSpeeds);if(gameTrackId==='builtin:'+id){currentMaxSpeed=prefs.maxSpeeds[id];updateMusicRate()}}
 function openMusicDb(){return new Promise((resolve,reject)=>{const req=indexedDB.open('NeonBlocksMusic',1);req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains('tracks'))db.createObjectStore('tracks',{keyPath:'id',autoIncrement:true})};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
@@ -224,9 +237,32 @@ async function updateUserMax(id,v){v=Math.max(1,Math.min(1.60,Number(v)||1.35));
 async function removeMusicTrack(id){stopMusicTest();try{const db=await openMusicDb();await new Promise((resolve,reject)=>{const tx=db.transaction('tracks','readwrite');tx.objectStore('tracks').delete(id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});if(gameTrackId==='user:'+id)resetGameMusic();await renderMusicList()}catch(e){}}
 async function updateImportedTrack(id,patch){try{const db=await openMusicDb();await new Promise((resolve,reject)=>{const tx=db.transaction('tracks','readwrite'),store=tx.objectStore('tracks'),r=store.get(id);r.onsuccess=()=>{const t=r.result;if(!t)return;Object.assign(t,patch);store.put(t)};tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});if(gameTrackId==='user:'+id&&patch.maxSpeed)currentMaxSpeed=Number(patch.maxSpeed)}catch(e){}}
 function setBuiltinEnabled(id,on){prefs.builtins[id]=on;putStore('builtinMusicEnabled',prefs.builtins);if(gameTrackId==='builtin:'+id&&!on){resetGameMusic();if(started&&!paused&&!over)startMusic()}}
-function stopMusicTest(){if(testAudio){try{testAudio.pause();testAudio.removeAttribute('src');testAudio.load()}catch(e){}testAudio=null}if(testUrl){URL.revokeObjectURL(testUrl);testUrl=null}if(testButton){testButton.textContent='TEST MAX';testButton.classList.remove('active');testButton=null}}
-async function testMusic(ref,rate,btn){if(testButton===btn){stopMusicTest();return}stopMusicTest();stopMusic();let src;if(ref.type==='builtin')src=ref.track.loopFile;else{testUrl=URL.createObjectURL(ref.track.blob);src=testUrl}testAudio=new Audio(src);testAudio.loop=true;testAudio.volume=Math.max(0,Math.min(1,prefs.musicVolume/100));testAudio.playbackRate=Number(rate)||1;testAudio.preservesPitch=false;testAudio.webkitPreservesPitch=false;testButton=btn;btn.textContent='STOP';btn.classList.add('active');testAudio.play().catch(()=>stopMusicTest())}
-function speedControls(ref,current,onChange){const row=document.createElement('div');row.className='speedRow';const lab=document.createElement('small');lab.className='speedLabel';lab.textContent='MAX SPEED';const slider=document.createElement('input');slider.type='range';slider.min='1.00';slider.max='1.60';slider.step='0.01';slider.value=Number(current).toFixed(2);const value=document.createElement('span');value.className='speedValue';value.textContent=Number(current).toFixed(2)+'×';const test=document.createElement('button');test.className='testSpeed';test.textContent='TEST MAX';slider.oninput=()=>{const v=Number(slider.value);value.textContent=v.toFixed(2)+'×';onChange(v);if(testButton===test&&testAudio)testAudio.playbackRate=v};test.onclick=()=>testMusic(ref,Number(slider.value),test);row.append(lab,slider,value,test);return row}
+function stopMusicTest(){
+ testGeneration++;
+ if(testNode){try{testNode.stop();testNode.disconnect()}catch(e){}testNode=null}
+ if(testGain){try{testGain.disconnect()}catch(e){}testGain=null}
+ if(testAudio){try{testAudio.pause();testAudio.removeAttribute('src');testAudio.load()}catch(e){}testAudio=null}if(testUrl){URL.revokeObjectURL(testUrl);testUrl=null}if(testButton){testButton.textContent='TEST MAX';testButton.classList.remove('active');testButton=null}}
+async function testMusic(ref,rate,btn){
+ if(testButton===btn){stopMusicTest();return}
+ stopMusicTest();stopMusic();testButton=btn;btn.textContent='LOADING…';btn.classList.add('active');
+ const token=testGeneration;
+ if(ref.type==='builtin'){
+  try{
+   const decoded=await decodeBundledLoop(ref.track.loopFile);
+   if(token!==testGeneration)return;
+   const a=audio();testGain=a.createGain();testGain.gain.value=prefs.musicVolume/100;testGain.connect(a.destination);
+   testNode=a.createBufferSource();testNode.buffer=decoded;testNode.loop=true;
+   testNode.playbackRate.value=Number(rate)||1;testNode.connect(testGain);testNode.start();
+   btn.textContent='STOP';return;
+  }catch(e){console.warn('Test audio fallback:',e)}
+ }
+ if(token!==testGeneration)return;
+ let src;if(ref.type==='builtin')src=ref.track.loopFile;else{testUrl=URL.createObjectURL(ref.track.blob);src=testUrl}
+ testAudio=new Audio(src);testAudio.loop=true;testAudio.volume=prefs.musicVolume/100;testAudio.playbackRate=Number(rate)||1;
+ testAudio.preservesPitch=false;testAudio.webkitPreservesPitch=false;
+ btn.textContent='STOP';testAudio.play().catch(()=>stopMusicTest());
+}
+function speedControls(ref,current,onChange){const row=document.createElement('div');row.className='speedRow';const lab=document.createElement('small');lab.className='speedLabel';lab.textContent='MAX SPEED';const slider=document.createElement('input');slider.type='range';slider.min='1.00';slider.max='1.60';slider.step='0.01';slider.value=Number(current).toFixed(2);const value=document.createElement('span');value.className='speedValue';value.textContent=Number(current).toFixed(2)+'×';const test=document.createElement('button');test.className='testSpeed';test.textContent='TEST MAX';slider.oninput=()=>{const v=Number(slider.value);value.textContent=v.toFixed(2)+'×';onChange(v);if(testButton===test){if(testAudio)testAudio.playbackRate=v;if(testNode)testNode.playbackRate.setTargetAtTime(v,audioCtx.currentTime,.04)}};test.onclick=()=>testMusic(ref,Number(slider.value),test);row.append(lab,slider,value,test);return row}
 function formatDuration(seconds){const n=Math.max(0,Math.round(seconds));return Math.floor(n/60)+':'+String(n%60).padStart(2,'0')}
 async function renderMusicList(){const host=$('musicList'),tracks=await musicTracks();host.innerHTML='';const builtTitle=document.createElement('div');builtTitle.className='musicSectionTitle';builtTitle.textContent='BUILT-IN SOUNDTRACK · '+BUILTIN_TRACKS.length+' TRACKS';host.appendChild(builtTitle);for(const t of BUILTIN_TRACKS){const max=builtinMax(t.id);if(prefs.maxSpeeds[t.id]==null)prefs.maxSpeeds[t.id]=max;const row=document.createElement('div');row.className='musicItem';const main=document.createElement('div');main.className='musicTop';const check=document.createElement('input');check.type='checkbox';check.checked=prefs.builtins[t.id]!==false;check.onchange=()=>setBuiltinEnabled(t.id,check.checked);const label=document.createElement('span');const name=document.createElement('b');name.textContent=t.name;const meta=document.createElement('span');meta.className='musicMeta';meta.textContent=t.note+' · intro plays once → middle loops';label.append(name,meta);main.append(check,label);row.append(main,speedControls({type:'builtin',track:t},max,v=>setBuiltinMax(t.id,v)));host.appendChild(row);
     const parts={intro:null,loop:null};for(const [part,path] of [['intro',t.introFile],['loop',t.loopFile]]){
@@ -235,35 +271,89 @@ async function renderMusicList(){const host=$('musicList'),tracks=await musicTra
       sample.onerror=()=>{meta.textContent=t.note+' · missing audio file: '+part};
       sample.src=path;
     }}putStore('builtinMusicMaxSpeeds',prefs.maxSpeeds);const userTitle=document.createElement('div');userTitle.className='musicSectionTitle';userTitle.textContent='YOUR SONGS';host.appendChild(userTitle);for(const t of tracks){const row=document.createElement('div');row.className='musicItem';const main=document.createElement('div');main.className='musicTop';const label=document.createElement('span');const name=document.createElement('b');name.textContent=t.name;const meta=document.createElement('span');meta.className='musicMeta';meta.textContent='Your audio · full track loops';label.append(name,meta);const del=document.createElement('button');del.textContent='REMOVE';del.onclick=()=>removeMusicTrack(t.id);main.append(label,del);const max=Number(t.maxSpeed||1.25);row.append(main,speedControls({type:'user',track:t},max,v=>updateImportedTrack(t.id,{maxSpeed:v})));host.appendChild(row)}if(!tracks.length){const empty=document.createElement('div');empty.className='emptyMusic';empty.textContent='No extra imported songs yet.';host.appendChild(empty)}}
+
+async function decodeBundledLoop(path){
+ const a=audio();if(!a)throw new Error('AudioContext not supported');
+ let buffer=null;
+ if(window.AndroidAudioAssets&&typeof AndroidAudioAssets.read==='function'){
+  const encoded=AndroidAudioAssets.read(path.split('/').pop());
+  if(encoded){
+   const raw=atob(encoded),bytes=new Uint8Array(raw.length);
+   for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
+   buffer=bytes.buffer;
+  }
+ }
+ if(!buffer){const result=await fetch(path);if(!result.ok)throw Error('Audio fetch failed');buffer=await result.arrayBuffer()}
+ return await a.decodeAudioData(buffer);
+}
+function pauseBufferedLoop(){
+ if(!loopNode)return;
+ if(loopBuffer&&audioCtx)loopPos=(loopPos+Math.max(0,audioCtx.currentTime-loopClock)*loopSpeed)%loopBuffer.duration;
+ try{loopNode.stop();loopNode.disconnect()}catch(e){}
+ loopNode=null;
+}
+function playBufferedLoop(){
+ if(!loopBuffer||loopNode||!prefs.music||!started||paused||over||appInBackground)return;
+ const a=audio();if(!a)return;
+ if(!loopGain){loopGain=a.createGain();loopGain.connect(a.destination)}
+ loopGain.gain.value=Math.max(0,Math.min(1,prefs.musicVolume/100));
+ const node=a.createBufferSource();node.buffer=loopBuffer;node.loop=true;
+ node.playbackRate.value=lastMusicRate;node.connect(loopGain);
+ loopClock=a.currentTime;loopSpeed=lastMusicRate;loopNode=node;
+ node.start(a.currentTime,loopPos%loopBuffer.duration);
+}
 function cleanupBgAudio(){
+ pauseBufferedLoop();if(loopGain)try{loopGain.disconnect()}catch(e){}
+ loopGain=null;loopBuffer=null;loopPos=0;
   for(const player of [bgAudio,bgLoopAudio])if(player){try{player.pause();player.onended=null;player.onerror=null;player.removeAttribute('src');player.load()}catch(e){}}
   bgAudio=null;bgLoopAudio=null;bgLoopSrc=null;
   if(bgUrl){URL.revokeObjectURL(bgUrl);bgUrl=null}
 }
 function resetGameMusic(){musicGeneration++;stopMusic();cleanupBgAudio();gameTrackId=null;lastMusicRate=1;currentMaxSpeed=1.35}
-function applyBgAudioSettings(){for(const player of [bgAudio,bgLoopAudio])if(player){player.volume=Math.max(0,Math.min(1,prefs.musicVolume/100));player.playbackRate=lastMusicRate;player.preservesPitch=false;player.webkitPreservesPitch=false}}
-function switchToBuiltinLoop(){
-  if(!bgLoopAudio||!gameTrackId||!gameTrackId.startsWith('builtin:'))return;
-  const intro=bgAudio;
-  if(intro){intro.onended=null;intro.pause()}
-  bgAudio=bgLoopAudio;bgLoopAudio=null;bgAudio.loop=true;applyBgAudioSettings();
-  if(prefs.music&&started&&!paused&&!over&&!appInBackground)bgAudio.play().catch(()=>{});
+function applyBgAudioSettings(){
+ const vol=Math.max(0,Math.min(1,prefs.musicVolume/100));
+ if(loopGain)loopGain.gain.value=vol;
+ for(const player of [bgAudio,bgLoopAudio])if(player){player.volume=vol;player.playbackRate=lastMusicRate;player.preservesPitch=false;player.webkitPreservesPitch=false}
 }
-async function chooseGameTrack(){const user=await musicTracks();let pool=[];for(const t of BUILTIN_TRACKS)if(prefs.builtins[t.id]!==false)pool.push({key:'builtin:'+t.id,type:'builtin',track:t,maxSpeed:builtinMax(t.id)});for(const t of user)pool.push({key:'user:'+t.id,type:'user',track:t,maxSpeed:Number(t.maxSpeed)||1.35});if(!pool.length){gameTrackId=null;return null}if(pool.length>1&&lastTrackId)pool=pool.filter(x=>x.key!==lastTrackId);const pick=pool[(Math.random()*pool.length)|0];gameTrackId=pick.key;lastTrackId=pick.key;currentMaxSpeed=Math.max(1,Math.min(1.60,pick.maxSpeed||1.35));if(pick.type==='builtin'){bgLoopSrc=pick.track.loopFile;bgLoopAudio=new Audio(bgLoopSrc);bgLoopAudio.loop=true;bgLoopAudio.preload='auto';bgLoopAudio.load();bgAudio=new Audio(pick.track.introFile);bgAudio.loop=false;bgAudio.onended=switchToBuiltinLoop}else{bgLoopSrc=null;bgUrl=URL.createObjectURL(pick.track.blob);bgAudio=new Audio(bgUrl);bgAudio.loop=true}bgAudio.preload='auto';lastMusicRate=1;applyBgAudioSettings();bgAudio.onerror=()=>{if(!over){cleanupBgAudio();gameTrackId=null;showMusicError('Soundtrack file unavailable. Add the original music assets to restore this track.')}};return pick}
+function switchToBuiltinLoop(){
+ if(!gameTrackId||!gameTrackId.startsWith('builtin:'))return;
+ const intro=bgAudio;
+ if(intro){intro.onended=null;intro.pause()}
+ if(loopBuffer){
+  bgAudio=null;
+  if(bgLoopAudio){bgLoopAudio.pause();bgLoopAudio.removeAttribute('src');bgLoopAudio.load();bgLoopAudio=null}
+  playBufferedLoop();return;
+ }
+ // Fallback to HTMLAudio for Android versions without supported decode.
+ bgAudio=bgLoopAudio;bgLoopAudio=null;
+ if(!bgAudio)return;
+ bgAudio.loop=true;applyBgAudioSettings();
+ if(prefs.music&&started&&!paused&&!over&&!appInBackground)bgAudio.play().catch(()=>{});
+}
+async function chooseGameTrack(){const generation=musicGeneration;const user=await musicTracks();if(generation!==musicGeneration)return null;let pool=[];for(const t of BUILTIN_TRACKS)if(prefs.builtins[t.id]!==false)pool.push({key:'builtin:'+t.id,type:'builtin',track:t,maxSpeed:builtinMax(t.id)});for(const t of user)pool.push({key:'user:'+t.id,type:'user',track:t,maxSpeed:Number(t.maxSpeed)||1.35});if(!pool.length){gameTrackId=null;return null}if(pool.length>1&&lastTrackId)pool=pool.filter(x=>x.key!==lastTrackId);const pick=pool[(Math.random()*pool.length)|0];gameTrackId=pick.key;lastTrackId=pick.key;currentMaxSpeed=Math.max(1,Math.min(1.60,pick.maxSpeed||1.35));if(pick.type==='builtin'){bgLoopSrc=pick.track.loopFile;bgLoopAudio=new Audio(bgLoopSrc);bgLoopAudio.loop=true;bgLoopAudio.preload='auto';
+    decodeBundledLoop(bgLoopSrc).then(decoded=>{
+      if(generation===musicGeneration&&gameTrackId===pick.key){loopBuffer=decoded;loopPos=0}
+    }).catch(e=>{console.warn('Using compatibility audio loop:',e)});
+    bgAudio=new Audio(pick.track.introFile);bgAudio.loop=false;bgAudio.onended=switchToBuiltinLoop}else{bgLoopSrc=null;bgUrl=URL.createObjectURL(pick.track.blob);bgAudio=new Audio(bgUrl);bgAudio.loop=true}bgAudio.preload='auto';lastMusicRate=1;applyBgAudioSettings();bgAudio.onerror=()=>{if(!over){cleanupBgAudio();gameTrackId=null;showMusicError('Soundtrack file unavailable. Add the original music assets to restore this track.')}};return pick}
 async function startMusic(){
   if(!prefs.music||!started||paused||over||appInBackground)return;
   const generation=musicGeneration;
   if(gameTrackId==null)await chooseGameTrack();
-  if(generation!==musicGeneration||!prefs.music||!started||paused||over||appInBackground||!bgAudio)return;
-  applyBgAudioSettings();bgAudio.play().catch(()=>{});
+  if(generation!==musicGeneration||!prefs.music||!started||paused||over||appInBackground)return;
+  applyBgAudioSettings();if(loopBuffer&&!bgAudio){playBufferedLoop();return}if(bgAudio)bgAudio.play().catch(()=>{});
 }
 function showMusicError(message){const label=$('musicStatus');if(label)label.textContent=message}
-function stopMusic(){if(bgAudio)try{bgAudio.pause()}catch(e){}if(bgLoopAudio)try{bgLoopAudio.pause()}catch(e){} }
+function stopMusic(){pauseBufferedLoop();if(bgAudio)try{bgAudio.pause()}catch(e){}if(bgLoopAudio)try{bgLoopAudio.pause()}catch(e){} }
 function tile(c,x,y,color,ghost=false,scale=S){const px=x*scale,py=y*scale,pad=Math.max(1,scale*.055),w=scale-pad*2;c.save();c.globalAlpha=ghost?.24:1;if(ghost){c.fillStyle=color;c.fillRect(px+pad,py+pad,w,w);c.strokeStyle='#e9fbff';c.lineWidth=Math.max(1,scale*.055);c.strokeRect(px+pad+1,py+pad+1,w-2,w-2);c.restore();return}c.shadowColor=color;c.shadowBlur=Math.max(10,scale*.38);c.fillStyle=color;c.fillRect(px+pad,py+pad,w,w);c.shadowBlur=0;const grad=c.createLinearGradient(px,py,px+scale,py+scale);grad.addColorStop(0,'rgba(255,255,255,.72)');grad.addColorStop(.16,'rgba(255,255,255,.18)');grad.addColorStop(.55,'rgba(255,255,255,0)');grad.addColorStop(1,'rgba(0,0,40,.30)');c.fillStyle=grad;c.fillRect(px+pad+1,py+pad+1,w-2,w-2);c.strokeStyle='rgba(255,255,255,.72)';c.lineWidth=Math.max(1,scale*.045);c.beginPath();c.moveTo(px+pad+2,py+scale-pad-2);c.lineTo(px+pad+2,py+pad+2);c.lineTo(px+scale-pad-2,py+pad+2);c.stroke();c.strokeStyle='rgba(0,0,40,.42)';c.beginPath();c.moveTo(px+scale-pad-2,py+pad+3);c.lineTo(px+scale-pad-2,py+scale-pad-2);c.lineTo(px+pad+3,py+scale-pad-2);c.stroke();c.strokeStyle='rgba(255,255,255,.20)';c.lineWidth=1;c.strokeRect(px+pad+3,py+pad+3,w-6,w-6);c.restore()}
 function drawBoard(){ctx.fillStyle='#10237e';ctx.fillRect(0,0,300,600);ctx.strokeStyle='#263ca0';ctx.lineWidth=.7;for(let x=1;x<W;x++){ctx.beginPath();ctx.moveTo(x*S,0);ctx.lineTo(x*S,600);ctx.stroke()}for(let y=1;y<H;y++){ctx.beginPath();ctx.moveTo(0,y*S);ctx.lineTo(300,y*S);ctx.stroke()}for(let y=0;y<H;y++)for(let x=0;x<W;x++)if(board[y]?.[x])tile(ctx,x,y,COLORS[board[y][x]]);if(clearAnim){const p=Math.min(1,(performance.now()-clearAnim.start)/clearAnim.duration),pulse=.42+.58*Math.abs(Math.sin(p*Math.PI*(clearAnim.n===4?8:5)));for(const y of clearAnim.rows){ctx.save();ctx.globalAlpha=pulse;ctx.fillStyle=clearAnim.n===4?'#fff8a8':'#d9ffff';ctx.shadowColor=clearAnim.n===4?'#ff42ed':'#00eeff';ctx.shadowBlur=clearAnim.n===4?28:18;ctx.fillRect(0,y*S+2,300,S-4);ctx.restore()}}if(particles.length){for(const q of particles){q.x+=q.vx;q.y+=q.vy;q.vy+=.12;q.life-=clearAnim&&clearAnim.n===4?.012:.017;if(q.life>0){ctx.save();ctx.globalAlpha=q.life;ctx.fillStyle=q.color;ctx.shadowColor=q.color;ctx.shadowBlur=10;ctx.fillRect(q.x,q.y,3.5,3.5);ctx.restore()}}particles=particles.filter(q=>q.life>0)}if(piece&&!over){if(prefs.ghost){let d=0;while(fits(piece,0,d+1))d++;piece.blocks.forEach(([x,y])=>{if(piece.y+y+d>=0)tile(ctx,piece.x+x,piece.y+y+d,COLORS[piece.t],true)})}piece.blocks.forEach(([x,y])=>{if(piece.y+y>=0)tile(ctx,piece.x+x,piece.y+y,COLORS[piece.t])})}}
 function preview(c,t,yOffset=0){if(!t)return;const b=SHAPES[t],xs=b.map(v=>v[0]),ys=b.map(v=>v[1]),l=Math.min(...xs),r=Math.max(...xs),top=Math.min(...ys),sz=18,ox=(100-(r-l+1)*sz)/2,oy=yOffset+5;for(const [x,y] of b){c.save();c.translate(ox,oy);tile(c,x-l,y-top,COLORS[t],false,sz);c.restore()}}
 function drawPreviews(){hc.clearRect(0,0,100,82);nc.clearRect(0,0,100,222);preview(hc,held,10);for(let i=0;i<3;i++)preview(nc,queue[i],i*70+3)}
-function loop(now){requestAnimationFrame(loop);if(canPlay()){dropAcc+=Math.min(now-previous,250);const interval=fallIntervalForLevel();if(dropAcc>=interval){softDrop(false);dropAcc-=interval}}if(bgAudio){const r=musicRate();if(Math.abs(r-lastMusicRate)>.0008){updateMusicRate()}}previous=now;drawBoard()}
+function loop(now){requestAnimationFrame(loop);if(canPlay()){dropAcc+=Math.min(now-previous,250);const interval=fallIntervalForLevel();if(dropAcc>=interval){softDrop(false);dropAcc-=interval}}if(bgAudio||loopNode){
+ const r=musicRate();if(Math.abs(r-lastMusicRate)>.0008)updateMusicRate();
+ if(bgAudio&&loopBuffer&&bgLoopAudio&&started&&!paused&&!over&&bgAudio.duration>0
+   &&isFinite(bgAudio.duration)&&!bgAudio.paused&&bgAudio.duration-bgAudio.currentTime<.03)
+  switchToBuiltinLoop();
+}previous=now;drawBoard()}
 requestAnimationFrame(loop);
 $('start').addEventListener('click',()=>{audio();if(paused){togglePause();return}countdown()});
 $('pauseBtn').addEventListener('click',()=>{togglePause();$('quickMenu').classList.remove('open')});
@@ -275,17 +365,17 @@ document.addEventListener('pointerdown',e=>{if(!$('quickMenu').contains(e.target
 function openSettings(show){$('settingsScreen').classList.toggle('show',show);if(show&&started&&!paused&&!over){modalPause=true;togglePause()}else if(!show){stopMusicTest();if(modalPause){modalPause=false;if(paused)togglePause()}}}
 $('settingsDone').addEventListener('click',()=>openSettings(false));
 $('musicOn').addEventListener('change',e=>{prefs.music=e.target.checked;putStore('musicEnabled',prefs.music);$('musicBtn').innerHTML=(prefs.music?'♫':'♩')+'&nbsp;&nbsp;Music On/Off';if(prefs.music)startMusic();else stopMusic()});
-$('musicVolume').addEventListener('input',e=>{prefs.musicVolume=Number(e.target.value);putStore('musicVolume',prefs.musicVolume);applyBgAudioSettings();if(testAudio)testAudio.volume=Math.max(0,Math.min(1,prefs.musicVolume/100))});
+$('musicVolume').addEventListener('input',e=>{prefs.musicVolume=Number(e.target.value);putStore('musicVolume',prefs.musicVolume);applyBgAudioSettings();if(testAudio)testAudio.volume=Math.max(0,Math.min(1,prefs.musicVolume/100));if(testGain)testGain.gain.value=Math.max(0,Math.min(1,prefs.musicVolume/100))});
 $('musicFiles').addEventListener('change',async e=>{await addMusicFiles(Array.from(e.target.files||[]));e.target.value=''});
 $('sfxOn').addEventListener('change',e=>{prefs.sfx=e.target.checked;putStore('sfxEnabled',prefs.sfx)});
 $('ghostOn').addEventListener('change',e=>{prefs.ghost=e.target.checked;putStore('ghostEnabled',prefs.ghost)});
 $('hapticLevel').addEventListener('change',e=>{prefs.haptic=Number(e.target.value);putStore('hapticStrength',prefs.haptic);haptic('rotate')});
 $('musicBtn').innerHTML=(prefs.music?'♫':'♩')+'&nbsp;&nbsp;Music On/Off';
 $('holdPanel').addEventListener('click',e=>{e.stopPropagation();holdPiece()});
-let sx=0,sy=0,lastX=0,lastY=0,startTime=0,moved=false,lastTap=0,gestureAxis=null;
+let sx=0,sy=0,lastX=0,lastY=0,startTime=0,moved=false,gestureAxis=null;
 canvas.addEventListener('pointerdown',e=>{if(!canPlay())return;audio();sx=lastX=e.clientX;sy=lastY=e.clientY;startTime=performance.now();moved=false;gestureAxis=null;canvas.setPointerCapture?.(e.pointerId)});
 canvas.addEventListener('pointermove',e=>{if(!canPlay())return;const r=canvas.getBoundingClientRect(),cell=r.width/10,totalX=e.clientX-sx,totalY=e.clientY-sy,dx=e.clientX-lastX,dy=e.clientY-lastY;if(!gestureAxis){if(totalY>cell*.32&&totalY>Math.abs(totalX)*1.18)gestureAxis='y';else if(Math.abs(totalX)>cell*.48&&Math.abs(totalX)>Math.abs(totalY)*1.25)gestureAxis='x'}if(gestureAxis==='x'&&Math.abs(dx)>=cell*.72){const active=piece,steps=Math.max(1,Math.floor(Math.abs(dx)/cell));for(let i=0;i<steps&&piece===active;i++)move(dx>0?1:-1);lastX=e.clientX;moved=true}else if(gestureAxis==='y'&&dy>=cell*.72){const active=piece,steps=Math.max(1,Math.floor(dy/cell));for(let i=0;i<steps&&piece===active&&performance.now()>=inputLockUntil;i++)softDrop(true);lastY=e.clientY;moved=true}});
-canvas.addEventListener('pointerup',e=>{if(!canPlay())return;const totalY=e.clientY-sy,dt=performance.now()-startTime;if(gestureAxis==='y'&&totalY>72&&dt<360){hardDrop();moved=true}else if(totalY<-42&&gestureAxis!=='y'){holdPiece();moved=true}if(!moved){const now=performance.now();if(now-lastTap<275){hardDrop();lastTap=0}else{rotate();lastTap=now}}gestureAxis=null});
+canvas.addEventListener('pointerup',e=>{if(!canPlay())return;const totalY=e.clientY-sy,dt=performance.now()-startTime;if(gestureAxis==='y'&&totalY>72&&dt<360){hardDrop();moved=true}else if(totalY<-42&&gestureAxis!=='y'){holdPiece();moved=true}if(!moved)rotate();gestureAxis=null});
 document.addEventListener('keydown',e=>{const m={ArrowLeft:()=>move(-1),ArrowRight:()=>move(1),ArrowUp:rotate,ArrowDown:()=>softDrop(true),' ':hardDrop,c:holdPiece,C:holdPiece};if(m[e.key]){e.preventDefault();m[e.key]()}if(e.key==='Escape'||e.key==='p')togglePause()});
 updateHud();drawPreviews();resizeBoard();renderMusicList();
 })();

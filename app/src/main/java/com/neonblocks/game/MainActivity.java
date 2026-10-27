@@ -15,6 +15,9 @@ import android.content.Context;
 import android.os.Build;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
+import android.util.Base64;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 
 public class MainActivity extends Activity {
     private static final int CHOOSE_AUDIO = 291;
@@ -36,6 +39,7 @@ public class MainActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(false);
         browser.setWebViewClient(new WebViewClient());
         browser.addJavascriptInterface(new HapticsBridge(), "AndroidHaptics");
+        browser.addJavascriptInterface(new AudioAssetBridge(), "AndroidAudioAssets");
         browser.setWebChromeClient(new WebChromeClient() {
             @Override public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
                 if (fileCallback != null) fileCallback.onReceiveValue(null);
@@ -50,6 +54,22 @@ public class MainActivity extends Activity {
         });
         setContentView(browser);
         browser.loadUrl("file:///android_asset/index.html");
+    }
+    private final class AudioAssetBridge {
+        @JavascriptInterface public String read(String filename) {
+            if (filename == null || !filename.matches("[a-z_]+_loop\\.m4a")) return "";
+            try (InputStream in = getAssets().open("music/" + filename);
+                 ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                byte[] bytes = new byte[32768];
+                int n, total = 0;
+                while ((n = in.read(bytes)) != -1) {
+                    total += n;
+                    if (total > 12 * 1024 * 1024) return "";
+                    out.write(bytes, 0, n);
+                }
+                return Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP);
+            } catch (Exception e) {return "";}
+        }
     }
     private final class HapticsBridge {
         @JavascriptInterface public void pulse(int strength, String kind) {
