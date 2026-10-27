@@ -1,0 +1,12 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'com.neonblocks.game'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'com.neonblocks.game'
+        minSdk 24
+        targetSdk 28
+        versionCode 1
+        versionName '1.0'
+    }
+}
