@@ -142,11 +142,11 @@ button{font:inherit;color:inherit}
     <h3 style="margin-top:14px">Add your own songs</h3><label class="musicUpload">＋ ADD SONGS<input id="musicFiles" type="file" accept="audio/*" multiple></label>
     <p class="hint">Seven beat-cut built-in tracks are included. Enable or disable them below. Set a separate maximum speed for each song and use TEST MAX to preview it. Imported songs get the same speed control. One random enabled track is selected per game, and its tempo rises smoothly with the actual falling speed.</p>
   </div>
-  <p class="hint">Controls: tap = rotate, swipe left/right = move, swipe down = soft drop. Once a downward gesture is recognized, horizontal movement is locked for the rest of that swipe. Quick downward flick = animated hard drop, swipe up or tap HOLD = hold piece.</p>
+  <p class="hint">Scoring: single 100 · double 300 · triple 500 · four lines 800, multiplied by level and a speed bonus (up to 3.5×). Faster difficulties earn more per clear. Controls: tap = rotate, swipe left/right = move, swipe down = soft drop. Once a downward gesture is recognized, horizontal movement is locked for the rest of that swipe. Quick downward flick = animated hard drop, swipe up or tap HOLD = hold piece.</p>
   <button class="sub" id="settingsDone">DONE</button>
 </div></div>
 <div class="screen" id="leaderboardScreen" aria-label="Local leaderboard"><div class="panel boardPanel">
-  <h2>★ NEON LEADERBOARD</h2><p class="hint">High scores saved on this device only. No account or internet required.</p>
+  <h2>★ NEON LEADERBOARD</h2><p class="hint">High scores saved on this device only. No account or internet required. Line clears receive a speed bonus up to 3.5× at faster falling speeds.</p>
   <div id="difficultyTabs" class="difficultyTabs" role="group" aria-label="Leaderboard difficulty">
       <button type="button" data-difficulty="easy">EASY</button>
       <button type="button" data-difficulty="medium">MEDIUM</button>
@@ -307,9 +307,18 @@ function removeCompletedRows(grid,rows){
   const remaining=grid.filter((_,y)=>!clearSet.has(y));
   return Array.from({length:grid.length-remaining.length},()=>Array(W).fill(null)).concat(remaining);
 }
+function lineClearSpeedMultiplier(intervalMs=fallIntervalForLevel()){
+  // Reward true downward speed (rows/second), using Easy level 1 as baseline.
+  // Square root avoids runaway scores at high levels; cap applies consistently.
+  return Math.min(3.5,Math.sqrt(820/Math.max(65,intervalMs)));
+}
+function lineClearPoints(n,gameLevel=level,intervalMs=fallIntervalForLevel()){
+  const base=[0,100,300,500,800][n]||0;
+  return Math.round(base*gameLevel*lineClearSpeedMultiplier(intervalMs));
+}
 function finishClear(rows,n){
   board=removeCompletedRows(board,rows);
-  score+=[0,100,300,500,800][n]*level;lines+=n;level=1+Math.floor(lines/10);
+  score+=lineClearPoints(n);lines+=n;level=1+Math.floor(lines/10);
   updateHud();clearAnim=null;lockDelay=false;spawn();
 }
 function showClearBanner(n){const b=$('lineBanner'),f=$('clearFlash'),wrap=$('boardWrap');b.textContent=['','SINGLE!','DOUBLE!','TRIPLE!','TETRIS!'][n]||'CLEAR!';b.className='lineBanner '+(n===4?'tetris ':'')+'show';f.className='clearFlash '+(n===4?'tetris ':'')+'show';if(n===4)wrap.classList.add('tetrisShake');setTimeout(()=>{b.className='lineBanner';f.className='clearFlash';wrap.classList.remove('tetrisShake')},n===4?1420:900)}
