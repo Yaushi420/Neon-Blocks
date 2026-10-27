@@ -36,6 +36,15 @@ button{font:inherit;color:inherit}
 .cover.hidden{display:none}
 .cover h2{margin:0 0 10px;font-size:28px;letter-spacing:1px;color:#fff;text-shadow:0 0 14px #00dbff}
 .cover p{margin:0 0 16px;color:#cbd8ff;font-size:13px;line-height:1.5}
+.difficultyPicker{display:grid;gap:6px;margin:10px auto 16px;max-width:270px;padding:12px 13px;background:#0c1354dd;border:1px solid #5c8af3;border-radius:11px}
+.difficultyPicker[hidden]{display:none}
+.difficultyPicker label{font-size:11px;letter-spacing:1.1px;font-weight:950;color:#90eaff}
+.difficultyPicker select{width:100%;padding:9px 13px;border:1px solid #8aa8ff;border-radius:7px;background:#222b87;color:#fff;font-size:16px;font-weight:900}
+.difficultyPicker small{color:#c0d1ff;font-size:11px;line-height:1.35}
+.difficultyTabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:14px}
+.difficultyTabs button{min-height:44px;border:1px solid #5a74d8;border-radius:8px;background:#162078;color:#bbd1ff;font-size:12px;font-weight:950}
+.difficultyTabs button.active{background:#3752bb;color:#fff;border-color:#7fe8ff;box-shadow:inset 0 -3px 0 #00dfff}
+
 .primary{min-width:112px;min-height:52px;border:0;border-radius:6px;background:#ffd10d;color:#171044;font-weight:1000;font-size:18px;box-shadow:0 4px 0 #ff8f00,0 0 14px #ffe84e66;cursor:pointer}
 .countdown{font-size:84px!important;color:#ffd31a!important;text-shadow:4px 4px 0 #ff7a00,-2px -2px 0 #fff,0 0 15px #ffec67!important}
 .screen{display:none;position:fixed;inset:0;z-index:40;background:#05063df5;padding:calc(env(safe-area-inset-top) + 16px) 14px calc(env(safe-area-inset-bottom) + 16px);overflow:auto}
@@ -81,7 +90,7 @@ button{font:inherit;color:inherit}
 <div id="app">
   <div class="hud">
     <div class="hudBox"><small>Lines</small><b id="lines">0</b></div>
-    <div class="hudBox"><small>Level</small><b id="level">1</b></div>
+    <div class="hudBox"><small id="levelLabel">Level</small><b id="level">1</b></div>
     <div class="hudBox scoreBox"><small>Score</small><b id="score">0</b></div>
     <div class="menuWrap">
       <button id="menuToggle" class="menuToggle" aria-label="Menu">☰</button>
@@ -99,7 +108,17 @@ button{font:inherit;color:inherit}
       <canvas id="board" width="300" height="600"></canvas>
       <div id="holdPanel" class="floating"><small>HOLD</small><canvas id="hold" width="100" height="82"></canvas></div>
       <div id="nextPanel" class="floating"><small>NEXT</small><canvas id="next" width="100" height="222"></canvas></div>
-      <div id="clearFlash" class="clearFlash"></div><div id="lineBanner" class="lineBanner"></div><div class="cover" id="cover"><div><h2 id="coverTitle">NEON BLOCKS</h2><p id="coverText">Tap to rotate · swipe to move/drop<br>Swipe up to hold · fast downward flick for hard drop</p><button class="primary" id="start">PLAY</button></div></div>
+      <div id="clearFlash" class="clearFlash"></div><div id="lineBanner" class="lineBanner"></div><div class="cover" id="cover"><div><h2 id="coverTitle">NEON BLOCKS</h2><p id="coverText">Tap to rotate · swipe to move/drop<br>Swipe up to hold · fast downward flick for hard drop</p>
+        <div class="difficultyPicker" id="difficultyPicker">
+          <label for="difficultySelect">CHOOSE DIFFICULTY</label>
+          <select id="difficultySelect" aria-label="Starting difficulty">
+            <option value="easy">EASY</option>
+            <option value="medium">MEDIUM</option>
+            <option value="hard">HARD</option>
+          </select>
+          <small id="difficultyDescription">Classic starting speed</small>
+        </div>
+        <button class="primary" id="start">PLAY</button></div></div>
     </div>
   </div>
   <div id="buttonControls" class="buttonControls" aria-label="Touch button controls">
@@ -128,7 +147,12 @@ button{font:inherit;color:inherit}
 </div></div>
 <div class="screen" id="leaderboardScreen" aria-label="Local leaderboard"><div class="panel boardPanel">
   <h2>★ NEON LEADERBOARD</h2><p class="hint">High scores saved on this device only. No account or internet required.</p>
-  <div id="scoreEntry" class="scoreEntry" hidden>
+  <div id="difficultyTabs" class="difficultyTabs" role="group" aria-label="Leaderboard difficulty">
+      <button type="button" data-difficulty="easy">EASY</button>
+      <button type="button" data-difficulty="medium">MEDIUM</button>
+      <button type="button" data-difficulty="hard">HARD</button>
+    </div>
+   <div id="scoreEntry" class="scoreEntry" hidden>
     <h3>RUN COMPLETE</h3><p id="runResult"></p>
     <label for="playerName">Your name</label><input id="playerName" maxlength="18" autocomplete="nickname" placeholder="PLAYER" />
     <button class="primary saveScore" id="saveScore">SAVE SCORE</button>
@@ -148,6 +172,34 @@ let board=[],queue=[],bag=[],piece=null,held=null,holdUsed=false,score=0,lines=0
 function getStore(k,d){try{const v=localStorage.getItem(k);return v===null?d:JSON.parse(v)}catch(e){return d}}
 function putStore(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 best=getStore('high',0);
+const DIFFICULTIES={
+  easy:{label:'Easy',startMs:820,description:'Classic speed · 820 ms per row'},
+  medium:{label:'Medium',startMs:480,description:'Fast start · 480 ms per row'},
+  hard:{label:'Hard',startMs:240,description:'Very fast start · 240 ms per row'}
+};
+let selectedDifficulty=getStore('neonSelectedDifficulty','easy');
+if(!DIFFICULTIES[selectedDifficulty])selectedDifficulty='easy';
+let runDifficulty=selectedDifficulty,viewDifficulty=selectedDifficulty;
+// Preserve the old on-device best score as the initial Easy record.
+let bestByDifficulty=getStore('neonBestByDifficulty_v1',null);
+if(!bestByDifficulty||typeof bestByDifficulty!=='object'||Array.isArray(bestByDifficulty)){
+  bestByDifficulty={easy:Math.max(0,Number(best)||0),medium:0,hard:0};
+  putStore('neonBestByDifficulty_v1',bestByDifficulty);
+}
+for(const key of Object.keys(DIFFICULTIES)){
+  if(!Number.isFinite(bestByDifficulty[key])||bestByDifficulty[key]<0)bestByDifficulty[key]=0;
+}
+best=bestByDifficulty[runDifficulty];
+$('difficultySelect').value=selectedDifficulty;
+function setSelectedDifficulty(next){
+  if(!DIFFICULTIES[next])return;
+  selectedDifficulty=next;
+  $('difficultySelect').value=next;
+  $('difficultyDescription').textContent=DIFFICULTIES[next].description;
+  putStore('neonSelectedDifficulty',next);
+}
+$('difficultySelect').addEventListener('change',e=>setSelectedDifficulty(e.target.value));
+setSelectedDifficulty(selectedDifficulty);
 const prefs={controls:getStore('controlMode','swipe'),buttonOrder:getStore('buttonOrder','rotate-first'),rotationSnap:getStore('rotationSnap','center'),music:getStore('musicEnabled',true),musicVolume:Number(getStore('musicVolume',85)),sfx:getStore('sfxEnabled',true),ghost:getStore('ghostEnabled',true),haptic:Number(getStore('hapticStrength',1)),builtins:getStore('builtinMusicEnabled',{pixel_classic:true,neon_drive:true,cinematic_rise:true,battle_99:true,swing_shift:true,hardbass_rush:true,neon_reactor:true}),maxSpeeds:getStore('builtinMusicMaxSpeeds',{})};
 $('musicOn').checked=prefs.music;$('musicVolume').value=String(prefs.musicVolume);$('sfxOn').checked=prefs.sfx;$('ghostOn').checked=prefs.ghost;$('hapticLevel').value=String(prefs.haptic);
 if(!['swipe','buttons'].includes(prefs.controls))prefs.controls='swipe';
@@ -179,11 +231,36 @@ function take(){while(queue.length<5){if(!bag.length)bag=shuffle(TYPES.slice());
 function make(t){return {t,x:3,y:-1,blocks:SHAPES[t].map(p=>p.slice()),rot:0,rotationHomeX:null,snapStyle:prefs.rotationSnap}}
 function fits(p,dx=0,dy=0,blocks=p.blocks){return blocks.every(([x,y])=>{const xx=p.x+x+dx,yy=p.y+y+dy;return xx>=0&&xx<W&&yy<H&&(yy<0||!board[yy][xx])})}
 function spawn(){piece=make(take());holdUsed=false;if(!fits(piece)){gameOver();return}drawPreviews()}
-function updateHud(){if(score>best){best=score;putStore('high',best)}$('score').textContent=score.toLocaleString();$('lines').textContent=String(lines);$('level').textContent=String(level)}
-function newGameState(){board=Array.from({length:H},()=>Array(W).fill(null));queue=[];bag=[];piece=null;held=null;holdUsed=false;score=0;lines=0;level=1;dropAcc=0;over=false;paused=false;started=true;counting=false;lockDelay=false;dropAnimating=false;inputLockUntil=0;clearAnim=null;particles=[];currentRunSaved=false;resetGameMusic();updateHud();spawn();previous=performance.now();startMusic()}
-function cover(title,text,button){$('coverTitle').classList.remove('countdown');$('coverTitle').textContent=title;$('coverText').textContent=text;$('coverText').style.display='block';$('start').textContent=button;$('start').style.display='inline-block';$('cover').classList.remove('hidden')}
+function updateHud(){
+ if(score>best){
+   best=score;bestByDifficulty[runDifficulty]=best;
+   putStore('neonBestByDifficulty_v1',bestByDifficulty);
+   if(runDifficulty==='easy')putStore('high',best);
+ }
+ $('score').textContent=score.toLocaleString();
+ $('lines').textContent=String(lines);
+ $('level').textContent=String(level);
+ $('levelLabel').textContent=DIFFICULTIES[runDifficulty].label.toUpperCase()+' LVL';
+}
+function newGameState(){
+ runDifficulty=selectedDifficulty;
+ best=bestByDifficulty[runDifficulty]||0;
+ board=Array.from({length:H},()=>Array(W).fill(null));queue=[];bag=[];piece=null;held=null;
+ holdUsed=false;score=0;lines=0;level=1;dropAcc=0;over=false;paused=false;
+ started=true;counting=false;lockDelay=false;dropAnimating=false;inputLockUntil=0;
+ clearAnim=null;particles=[];currentRunSaved=false;
+ resetGameMusic();updateHud();spawn();previous=performance.now();startMusic();
+}
+function cover(title,text,button){
+ $('coverTitle').classList.remove('countdown');
+ $('coverTitle').textContent=title;$('coverText').textContent=text;
+ $('coverText').style.display='block';
+ $('difficultyPicker').hidden=title!=='GAME OVER'&&title!=='NEON BLOCKS';
+ $('start').textContent=button;$('start').style.display='inline-block';
+ $('cover').classList.remove('hidden');
+}
 function hideCover(){$('cover').classList.add('hidden')}
-function countdown(){if(counting)return;counting=true;started=false;over=false;$('cover').classList.remove('hidden');$('coverText').style.display='none';$('start').style.display='none';$('coverTitle').classList.add('countdown');let n=3;$('coverTitle').textContent=n;const timer=setInterval(()=>{n--;if(n>0){$('coverTitle').textContent=n;beep(210+n*45,.055,.35)}else{clearInterval(timer);$('coverTitle').classList.remove('countdown');$('coverText').style.display='block';$('start').style.display='inline-block';newGameState();hideCover();beep(460,.08,.55)}},650)}
+function countdown(){if(counting)return;counting=true;started=false;over=false;$('cover').classList.remove('hidden');$('coverText').style.display='none';$('difficultyPicker').hidden=true;$('start').style.display='none';$('coverTitle').classList.add('countdown');let n=3;$('coverTitle').textContent=n;const timer=setInterval(()=>{n--;if(n>0){$('coverTitle').textContent=n;beep(210+n*45,.055,.35)}else{clearInterval(timer);$('coverTitle').classList.remove('countdown');$('coverText').style.display='block';$('start').style.display='inline-block';newGameState();hideCover();beep(460,.08,.55)}},650)}
 function move(dx){if(!canPlay())return false;if(fits(piece,dx,0)){piece.x+=dx;if(piece.rotationHomeX!==null)piece.rotationHomeX+=dx;beep(150,.025,.14);haptic('move');return true}return false}
 function rotated(blocks){return blocks.map(([x,y])=>[3-y,x])}
 // Straight piece: consistent orientation-relative offsets, so four turns cancel.
@@ -237,32 +314,76 @@ function finishClear(rows,n){
 }
 function showClearBanner(n){const b=$('lineBanner'),f=$('clearFlash'),wrap=$('boardWrap');b.textContent=['','SINGLE!','DOUBLE!','TRIPLE!','TETRIS!'][n]||'CLEAR!';b.className='lineBanner '+(n===4?'tetris ':'')+'show';f.className='clearFlash '+(n===4?'tetris ':'')+'show';if(n===4)wrap.classList.add('tetrisShake');setTimeout(()=>{b.className='lineBanner';f.className='clearFlash';wrap.classList.remove('tetrisShake')},n===4?1420:900)}
 function makeParticles(rows,n){const palette=n===4?['#00f6ff','#ffef27','#ff3be8','#82ff62','#fff']:['#00edff','#fff','#7a8cff'];particles=[];for(const y of rows)for(let i=0;i<(n===4?34:16);i++)particles.push({x:Math.random()*300,y:y*S+S/2,vx:(Math.random()-.5)*(n===4?5:3),vy:(Math.random()-.75)*(n===4?6:4),life:1,color:palette[(Math.random()*palette.length)|0]})}
-function gameOver(){over=true;started=false;piece=null;stopMusic();beep(92,.2,.28);haptic('over');cover('GAME OVER','Score '+score.toLocaleString()+' · Best '+best.toLocaleString(),'RESTART');openLeaderboard(true)}
+function gameOver(){over=true;started=false;piece=null;stopMusic();beep(92,.2,.28);haptic('over');cover('GAME OVER',DIFFICULTIES[runDifficulty].label+' · Score '+score.toLocaleString()+' · Best '+best.toLocaleString(),'RESTART');openLeaderboard(true)}
 function togglePause(){if(!started||over||counting)return;paused=!paused;$('pauseBtn').innerHTML=paused?'<span class="menuGlyph cyan">▶</span>Resume':'<span class="menuGlyph cyan">Ⅱ</span>Pause';if(paused){stopMusic();cover('PAUSED','Tap resume to continue','RESUME')}else{hideCover();previous=performance.now();startMusic()}}
 
-let boardEntries=getStore('neonLeaderboard_v1',[]);if(!Array.isArray(boardEntries))boardEntries=[];
+let boardEntriesByDifficulty=getStore('neonLeaderboards_v2',null);
+if(!boardEntriesByDifficulty||typeof boardEntriesByDifficulty!=='object'||Array.isArray(boardEntriesByDifficulty)){
+  // One-time migration: scores from versions <=2.4 belong to Easy.
+  const oldEntries=getStore('neonLeaderboard_v1',[]);
+  boardEntriesByDifficulty={
+    easy:Array.isArray(oldEntries)?oldEntries.slice(0,30):[],
+    medium:[],hard:[]
+  };
+  putStore('neonLeaderboards_v2',boardEntriesByDifficulty);
+}
+for(const key of Object.keys(DIFFICULTIES)){
+  if(!Array.isArray(boardEntriesByDifficulty[key]))boardEntriesByDifficulty[key]=[];
+}
 let leaderboardPaused=false,currentRunSaved=false;
-function renderLeaderboard(){const parent=$('leaderboardEntries');parent.textContent='';
-  boardEntries.slice().sort((a,b)=>b.score-a.score||a.date.localeCompare(b.date)).slice(0,30).forEach((item,i)=>{
-    const row=document.createElement('div');row.className='boardResult';const rank=document.createElement('span'),name=document.createElement('span'),value=document.createElement('span');
-    rank.textContent=i===0?'★ 1':String(i+1);name.textContent=item.name;value.textContent=item.score.toLocaleString();row.title=item.lines+' lines · Level '+item.level;
-    row.append(rank,name,value);parent.append(row)
-  });
-  if(!parent.children.length){const empty=document.createElement('p');empty.className='hint';empty.style.padding='12px';empty.textContent='No scores yet. Finish a run to enter your name.';parent.append(empty)}
+function renderLeaderboard(){
+ const parent=$('leaderboardEntries');parent.textContent='';
+ for(const tab of document.querySelectorAll('#difficultyTabs button')){
+   const active=tab.dataset.difficulty===viewDifficulty;
+   tab.classList.toggle('active',active);tab.setAttribute('aria-pressed',String(active));
+ }
+ const entries=boardEntriesByDifficulty[viewDifficulty]||[];
+ entries.slice().sort((a,b)=>b.score-a.score||String(a.date||'').localeCompare(String(b.date||''))).slice(0,30).forEach((item,i)=>{
+   const row=document.createElement('div');row.className='boardResult';
+   const rank=document.createElement('span'),name=document.createElement('span'),value=document.createElement('span');
+   rank.textContent=i===0?'★ 1':String(i+1);
+   name.textContent=item.name;
+   value.textContent=Number(item.score).toLocaleString();
+   row.title=item.lines+' lines · Level '+item.level;
+   row.append(rank,name,value);parent.append(row);
+ });
+ if(!parent.children.length){
+   const empty=document.createElement('p');empty.className='hint';empty.style.padding='12px';
+   empty.textContent='No '+DIFFICULTIES[viewDifficulty].label+' scores yet. Finish a run to enter your name.';
+   parent.append(empty);
+ }
 }
-function openLeaderboard(offerEntry=false){$('quickMenu').classList.remove('open');
-  if(!offerEntry&&started&&!paused&&!over){leaderboardPaused=true;togglePause()}
-  $('scoreEntry').hidden=!offerEntry||currentRunSaved;
-  if(offerEntry&&!currentRunSaved){$('runResult').textContent='Score '+score.toLocaleString()+' · '+lines+' lines · Level '+level;$('playerName').value=getStore('neonPlayerName','')}
-  renderLeaderboard();$('leaderboardScreen').classList.add('show');
+function openLeaderboard(offerEntry=false){
+ $('quickMenu').classList.remove('open');
+ if(!offerEntry&&started&&!paused&&!over){leaderboardPaused=true;togglePause()}
+ viewDifficulty=offerEntry||started?runDifficulty:selectedDifficulty;
+ $('scoreEntry').hidden=!offerEntry||currentRunSaved;
+ if(offerEntry&&!currentRunSaved){
+   $('runResult').textContent=DIFFICULTIES[runDifficulty].label.toUpperCase()+' · Score '+score.toLocaleString()+' · '+lines+' lines · Level '+level;
+   $('playerName').value=getStore('neonPlayerName','');
+ }
+ renderLeaderboard();$('leaderboardScreen').classList.add('show');
 }
-function closeLeaderboard(){$('leaderboardScreen').classList.remove('show');if(leaderboardPaused){leaderboardPaused=false;if(paused)togglePause()}}
-function savePlayerScore(){if(currentRunSaved)return;
-  const name=String($('playerName').value||'PLAYER').trim().replace(/[^A-Za-z0-9 _-]/g,'').slice(0,18)||'PLAYER';
-  putStore('neonPlayerName',name);
-  boardEntries.push({name,score,lines,level,date:new Date().toISOString()});
-  boardEntries.sort((a,b)=>b.score-a.score||a.date.localeCompare(b.date));boardEntries=boardEntries.slice(0,30);
-  putStore('neonLeaderboard_v1',boardEntries);currentRunSaved=true;$('scoreEntry').hidden=true;renderLeaderboard();
+document.querySelectorAll('#difficultyTabs button').forEach(button=>{
+ button.addEventListener('click',()=>{
+   if(DIFFICULTIES[button.dataset.difficulty]){viewDifficulty=button.dataset.difficulty;renderLeaderboard()}
+ });
+});
+function closeLeaderboard(){
+ $('leaderboardScreen').classList.remove('show');
+ if(leaderboardPaused){leaderboardPaused=false;if(paused)togglePause()}
+}
+function savePlayerScore(){
+ if(currentRunSaved)return;
+ const name=String($('playerName').value||'PLAYER').trim().replace(/[^A-Za-z0-9 _-]/g,'').slice(0,18)||'PLAYER';
+ putStore('neonPlayerName',name);
+ const entries=boardEntriesByDifficulty[runDifficulty];
+ entries.push({name,score,lines,level,date:new Date().toISOString()});
+ entries.sort((a,b)=>b.score-a.score||String(a.date||'').localeCompare(String(b.date||'')));
+ boardEntriesByDifficulty[runDifficulty]=entries.slice(0,30);
+ putStore('neonLeaderboards_v2',boardEntriesByDifficulty);
+ currentRunSaved=true;$('scoreEntry').hidden=true;
+ viewDifficulty=runDifficulty;renderLeaderboard();
 }
 $('saveScore').addEventListener('click',savePlayerScore);
 $('playerName').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();savePlayerScore()}});
@@ -297,7 +418,7 @@ function lineSound(n){if(!prefs.sfx)return;const a=audio(),t=a?a.currentTime:nul
 else if(n===2){bassHit(86,.25,1.25,.47,t);bassHit(128,.16,.58,.51,t+.09);[392,523,659].forEach((f,i)=>tone(f,.14,.34+i*.04,'triangle',t+.04+i*.07));noiseBurst(.09,.055,1500)}
 else if(n===3){bassHit(76,.30,1.42,.43,t);bassHit(114,.19,.65,.48,t+.10);[330,440,554,659,880].forEach((f,i)=>tone(f,.16,.34+i*.045,'triangle',t+.035+i*.06));noiseBurst(.12,.075,2100)}
 else{bassHit(62,.41,1.58,.40,t);bassHit(96,.29,1.10,.43,t+.085);bassHit(132,.18,.68,.48,t+.19);noiseBurst(.22,.16,3600);[261,392,523,659,784,1047,1319].forEach((f,i)=>tone(f,.20,.38+i*.05,i<2?'triangle':'sine',t+.055+i*.055));setTimeout(()=>{bassHit(72,.32,1.15,.42);tone(1568,.25,.72,'sine');tone(2093,.20,.46,'sine')},310)}}
-function fallIntervalForLevel(l=level){return Math.max(65,820*Math.pow(.82,l-1))}
+function fallIntervalForLevel(l=level){return Math.max(65,DIFFICULTIES[runDifficulty].startMs*Math.pow(.82,l-1))}
 function musicProgress(){const interval=fallIntervalForLevel(),ratio=820/interval,maxRatio=820/65;const fraction=Math.max(0,Math.min(1,Math.log(ratio)/Math.log(maxRatio)));return Math.pow(fraction,.7)}
 function musicRate(){return 1+(Math.max(1,currentMaxSpeed)-1)*musicProgress()}
 function updateMusicRate(){

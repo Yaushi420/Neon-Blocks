@@ -6,7 +6,7 @@ android {
         applicationId 'com.neonblocks.game'
         minSdk 24
         targetSdk 28
-        versionCode 15
-        versionName '2.4'
+        versionCode 16
+        versionName '2.5'
     }
 }
